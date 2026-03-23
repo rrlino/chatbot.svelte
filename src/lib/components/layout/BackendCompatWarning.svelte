@@ -21,12 +21,12 @@
 {#if missingEndpoints.length > 0}
 	<div class="fixed bottom-4 right-4 max-w-md bg-gray-800 text-white rounded-lg shadow-lg z-[9999] text-xs overflow-hidden">
 		<!-- Header -->
-		<button
+		<div
+			role="button"
+			tabindex="0"
 			class="flex items-center w-full px-3 py-2 bg-gray-700 hover:bg-gray-600 transition-colors text-left cursor-pointer"
 			onclick={() => (expanded = !expanded)}
 			onkeydown={(e) => e.key === 'Enter' && (expanded = !expanded)}
-			role="button"
-			tabindex="0"
 		>
 			<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-500 text-gray-900 mr-2">{missingEndpoints.length}</span>
 			<span>Missing backend endpoints</span>
@@ -44,7 +44,7 @@
 			>
 				<X class="h-3.5 w-3.5" />
 			</button>
-		</button>
+		</div>
 
 		<!-- Body -->
 		{#if expanded}
