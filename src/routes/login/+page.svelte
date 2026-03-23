@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { BotIcon } from 'lucide-svelte';
+	import { Bot } from 'lucide-svelte';
 	import LanguageSwitcher from '$components/layout/LanguageSwitcher.svelte';
 	import { auth } from '$lib/stores/auth';
 
@@ -56,7 +56,7 @@
 				<div class="flex justify-end mb-2">
 					<LanguageSwitcher bind:currentLang />
 				</div>
-				<BotIcon class="h-12 w-12 text-primary mx-auto mb-3" />
+				<Bot class="h-12 w-12 text-primary mx-auto mb-3" />
 				<h2 class="text-2xl font-bold text-gray-900">Login</h2>
 				<p class="text-gray-500 mt-1">Admin Panel</p>
 			</div>
