@@ -1,6 +1,7 @@
 <script lang="ts">
 	import '../app.css';
 	import Navbar from '$components/layout/Navbar.svelte';
+	import BackendCompatWarning from '$components/layout/BackendCompatWarning.svelte';
 	import { page } from '$app/state';
 
 	let { children } = $props();
@@ -14,3 +15,4 @@
 <main class="{isLoginPage ? '' : 'pt-14'}">
 	{@render children()}
 </main>
+<BackendCompatWarning />
