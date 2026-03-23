@@ -1,0 +1,32 @@
+{
+	"menu": {
+		"dashboard": "Dashboard",
+		"users": "Users",
+		"messages": "Messages",
+		"chatbots": "Chatbots",
+		"system": "System",
+		"conversation": "Conversation",
+		"logout": "Logout"
+	},
+	"submenu": {
+		"chatbotManagement": "Chatbot Management",
+		"journeys": "Journeys",
+		"journeyResponses": "Journey Responses",
+		"variables": "Variables",
+		"settings": "Settings",
+		"admins": "Admins",
+		"upgrade": "Upgrade",
+		"dataDeletions": "Data Deletions"
+	},
+	"common": {
+		"save": "Save",
+		"cancel": "Cancel",
+		"delete": "Delete",
+		"edit": "Edit",
+		"add": "Add",
+		"create": "Create",
+		"search": "Search",
+		"loading": "Loading...",
+		"logout": "Logout"
+	}
+}

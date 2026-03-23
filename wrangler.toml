@@ -1,0 +1,7 @@
+name = "chatbot-svelte"
+main = ".svelte-kit/cloudflare/_worker.js"
+compatibility_date = "2026-03-22"
+
+[assets]
+directory = ".svelte-kit/cloudflare"
+binding = "ASSETS"

@@ -1,0 +1,32 @@
+{
+	"menu": {
+		"dashboard": "Painel",
+		"users": "Usuários",
+		"messages": "Mensagens",
+		"chatbots": "Chatbots",
+		"system": "Sistema",
+		"conversation": "Conversa",
+		"logout": "Sair"
+	},
+	"submenu": {
+		"chatbotManagement": "Gerenciamento de Chatbots",
+		"journeys": "Jornadas",
+		"journeyResponses": "Respostas de Jornada",
+		"variables": "Variáveis",
+		"settings": "Configurações",
+		"admins": "Administradores",
+		"upgrade": "Atualização",
+		"dataDeletions": "Exclusão de Dados"
+	},
+	"common": {
+		"save": "Salvar",
+		"cancel": "Cancelar",
+		"delete": "Excluir",
+		"edit": "Editar",
+		"add": "Adicionar",
+		"create": "Criar",
+		"search": "Buscar",
+		"loading": "Carregando...",
+		"logout": "Sair"
+	}
+}
