@@ -16,10 +16,9 @@ function createAuthStore() {
 	return {
 		subscribe,
 		async login(username: string, password: string) {
-			const email = username.includes('@') ? username : `${username}@localhost.com`;
 			const response = await apiFetch<{ data?: { token?: string; access_token?: string; user?: unknown; refresh_token?: string }; token?: string; access_token?: string; user?: unknown; refresh_token?: string }>(endpoints.auth.login, {
 				method: 'POST',
-				body: JSON.stringify({ email, password })
+				body: JSON.stringify({ username, password })
 			});
 
 			const authData = response.data || response;
