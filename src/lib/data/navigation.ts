@@ -23,7 +23,8 @@ export const chatbotMenu: DropdownMenu = {
 		{ label: 'Chatbot Management', href: '/chatbots', icon: 'robot' },
 		{ label: 'Journeys', href: '/journeys', icon: 'signpost' },
 		{ label: 'Journey Responses', href: '/journey-responses', icon: 'chat-square-text' },
-		{ label: 'Variables', href: '/variables', icon: 'code-square' }
+		{ label: 'Variables', href: '/variables', icon: 'code-square' },
+		{ label: 'Training Assignments', href: '/training-assignments', icon: 'clipboard-check' }
 	]
 };
 
@@ -32,8 +33,44 @@ export const systemMenu: DropdownMenu = {
 	icon: 'gear',
 	items: [
 		{ label: 'Settings', href: '/system-settings', icon: 'sliders' },
+		{ label: 'Upgrade', href: '/system-upgrade', icon: 'rocket' },
 		{ label: 'Admins', href: '/admin-users', icon: 'person-badge' },
-		{ label: 'Upgrade', href: '/system-settings?tab=upgrades', icon: 'rocket' },
-		{ label: 'Data Deletions', href: '/data-deletions', icon: 'trash' }
+		{ label: 'Security Alerts', href: '/security-alert-review', icon: 'shield-check' },
+		{ label: 'Rate Limiting', href: '/rate-limiting', icon: 'speedometer2' },
+		{ label: 'Data Deletions', href: '/data-deletions', icon: 'trash' },
+		{ label: 'Audit Logs', href: '/notifications', icon: 'journal-text' }
 	]
 };
+
+export const integrationsMenu: DropdownMenu = {
+	label: 'Integrations',
+	icon: 'plug',
+	items: [
+		{ label: 'Channels', href: '/partner-management', icon: 'diagram-3' },
+		{ label: 'Webhooks', href: '/webhook-management', icon: 'link-45deg' },
+		{ label: 'API Tokens', href: '/api-tokens', icon: 'key' },
+		{ label: 'API Docs', href: '/api-docs', icon: 'file-earmark-code' },
+		{ label: 'API Management', href: '/api-management', icon: 'braces' }
+	]
+};
+
+export const fitnessMenu: DropdownMenu = {
+	label: 'Fitness',
+	icon: 'heart-pulse',
+	items: [
+		{ label: 'Exercises', href: '/fitness-exercises', icon: 'dumbbell' },
+		{ label: 'Training Sets', href: '/fitness-training-sets', icon: 'bar-chart-steps' },
+		{ label: 'PARQ', href: '/fitness-parq', icon: 'clipboard2-pulse' },
+		{ label: 'PARQ Alt', href: '/fitness-parq-alt', icon: 'clipboard2-heart' }
+	]
+};
+
+export const aiMenu: DropdownMenu = {
+	label: 'AI',
+	icon: 'cpu',
+	items: [
+		{ label: 'AI Training', href: '/ai-training', icon: 'stars' }
+	]
+};
+
+export const allMenus: DropdownMenu[] = [chatbotMenu, systemMenu, integrationsMenu, fitnessMenu, aiMenu];

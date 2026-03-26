@@ -3,10 +3,11 @@
 	import { goto } from '$app/navigation';
 	import {
 		MessageCircle, Users, Bot, Settings, ChevronDown,
-		LogOut, Moon, Sun, Globe, Menu, X, BotIcon
+		LogOut, Moon, Sun, Globe, Menu, X, BotIcon,
+		HeartPulse, Cpu
 	} from 'lucide-svelte';
 	import LanguageSwitcher from './LanguageSwitcher.svelte';
-	import { mainNav, chatbotMenu, systemMenu } from '$data/navigation';
+	import { mainNav, chatbotMenu, systemMenu, integrationsMenu, fitnessMenu, aiMenu } from '$data/navigation';
 
 	let currentLang = $state('pt');
 	let mobileMenuOpen = $state(false);
@@ -140,6 +141,69 @@
 					{/if}
 				</div>
 			</div>
+
+				<!-- Integrations Dropdown -->
+				<div class="relative">
+					<button
+						onclick={() => toggleDropdown('integrations')}
+						onmouseenter={() => { if (window.innerWidth >= 1024) openDropdown = 'integrations'; }}
+						class="flex items-center gap-1.5 px-3 py-2 text-sm font-semibold rounded-md transition-colors
+							{isDropdownActive(integrationsMenu.items) || openDropdown === 'integrations' ? 'bg-white/20 text-white' : 'text-white/80 hover:bg-white/10 hover:text-white'}"
+					>
+						<Globe class="h-4 w-4" />
+						{integrationsMenu.label}
+						<ChevronDown class="h-3.5 w-3.5 transition-transform {openDropdown === 'integrations' ? 'rotate-180' : ''}" />
+					</button>
+					{#if openDropdown === 'integrations'}
+						<div class="absolute left-0 top-full mt-1 w-56 bg-white rounded-lg shadow-xl border border-gray-200 py-1 z-50">
+							{#each integrationsMenu.items as item}
+								<a href={item.href} onclick={() => navigate(item.href)} class="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 hover:text-blue-600 transition-colors">{item.label}</a>
+							{/each}
+						</div>
+					{/if}
+				</div>
+
+				<!-- Fitness Dropdown -->
+				<div class="relative">
+					<button
+						onclick={() => toggleDropdown('fitness')}
+						onmouseenter={() => { if (window.innerWidth >= 1024) openDropdown = 'fitness'; }}
+						class="flex items-center gap-1.5 px-3 py-2 text-sm font-semibold rounded-md transition-colors
+							{isDropdownActive(fitnessMenu.items) || openDropdown === 'fitness' ? 'bg-white/20 text-white' : 'text-white/80 hover:bg-white/10 hover:text-white'}"
+					>
+						<HeartPulse class="h-4 w-4" />
+						{fitnessMenu.label}
+						<ChevronDown class="h-3.5 w-3.5 transition-transform {openDropdown === 'fitness' ? 'rotate-180' : ''}" />
+					</button>
+					{#if openDropdown === 'fitness'}
+						<div class="absolute left-0 top-full mt-1 w-56 bg-white rounded-lg shadow-xl border border-gray-200 py-1 z-50">
+							{#each fitnessMenu.items as item}
+								<a href={item.href} onclick={() => navigate(item.href)} class="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 hover:text-blue-600 transition-colors">{item.label}</a>
+							{/each}
+						</div>
+					{/if}
+				</div>
+
+				<!-- AI Dropdown -->
+				<div class="relative">
+					<button
+						onclick={() => toggleDropdown('ai')}
+						onmouseenter={() => { if (window.innerWidth >= 1024) openDropdown = 'ai'; }}
+						class="flex items-center gap-1.5 px-3 py-2 text-sm font-semibold rounded-md transition-colors
+							{isDropdownActive(aiMenu.items) || openDropdown === 'ai' ? 'bg-white/20 text-white' : 'text-white/80 hover:bg-white/10 hover:text-white'}"
+					>
+						<Cpu class="h-4 w-4" />
+						{aiMenu.label}
+						<ChevronDown class="h-3.5 w-3.5 transition-transform {openDropdown === 'ai' ? 'rotate-180' : ''}" />
+					</button>
+					{#if openDropdown === 'ai'}
+						<div class="absolute left-0 top-full mt-1 w-56 bg-white rounded-lg shadow-xl border border-gray-200 py-1 z-50">
+							{#each aiMenu.items as item}
+								<a href={item.href} onclick={() => navigate(item.href)} class="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 hover:text-blue-600 transition-colors">{item.label}</a>
+							{/each}
+						</div>
+					{/if}
+				</div>
 
 			<!-- Right side: Language + User -->
 			<div class="hidden lg:flex items-center gap-2">
@@ -283,7 +347,55 @@
 					</div>
 				{/if}
 
-				<!-- Mobile Bottom Section -->
+					<!-- Integrations Mobile -->
+				<button
+					onclick={() => toggleDropdown('integrations')}
+					class="flex items-center justify-between w-full px-3 py-2.5 text-sm font-medium rounded-md text-white/80 hover:bg-white/10 hover:text-white transition-colors"
+				>
+					<span>{integrationsMenu.label}</span>
+					<ChevronDown class="h-4 w-4 transition-transform {openDropdown === 'integrations' ? 'rotate-180' : ''}" />
+				</button>
+				{#if openDropdown === 'integrations'}
+					<div class="ml-4 pl-3 border-l-2 border-white/20 space-y-1">
+						{#each integrationsMenu.items as item}
+							<a href={item.href} onclick={() => navigate(item.href)} class="block px-3 py-2 text-sm text-white/80 hover:text-white hover:bg-white/5 rounded-md transition-colors">{item.label}</a>
+						{/each}
+					</div>
+				{/if}
+
+				<!-- Fitness Mobile -->
+				<button
+					onclick={() => toggleDropdown('fitness')}
+					class="flex items-center justify-between w-full px-3 py-2.5 text-sm font-medium rounded-md text-white/80 hover:bg-white/10 hover:text-white transition-colors"
+				>
+					<span>{fitnessMenu.label}</span>
+					<ChevronDown class="h-4 w-4 transition-transform {openDropdown === 'fitness' ? 'rotate-180' : ''}" />
+				</button>
+				{#if openDropdown === 'fitness'}
+					<div class="ml-4 pl-3 border-l-2 border-white/20 space-y-1">
+						{#each fitnessMenu.items as item}
+							<a href={item.href} onclick={() => navigate(item.href)} class="block px-3 py-2 text-sm text-white/80 hover:text-white hover:bg-white/5 rounded-md transition-colors">{item.label}</a>
+						{/each}
+					</div>
+				{/if}
+
+				<!-- AI Mobile -->
+				<button
+					onclick={() => toggleDropdown('ai')}
+					class="flex items-center justify-between w-full px-3 py-2.5 text-sm font-medium rounded-md text-white/80 hover:bg-white/10 hover:text-white transition-colors"
+				>
+					<span>{aiMenu.label}</span>
+					<ChevronDown class="h-4 w-4 transition-transform {openDropdown === 'ai' ? 'rotate-180' : ''}" />
+				</button>
+				{#if openDropdown === 'ai'}
+					<div class="ml-4 pl-3 border-l-2 border-white/20 space-y-1">
+						{#each aiMenu.items as item}
+							<a href={item.href} onclick={() => navigate(item.href)} class="block px-3 py-2 text-sm text-white/80 hover:text-white hover:bg-white/5 rounded-md transition-colors">{item.label}</a>
+						{/each}
+					</div>
+				{/if}
+
+			<!-- Mobile Bottom Section -->
 				<div class="border-t border-white/20 pt-2 mt-2 space-y-1">
 					<button
 						onclick={toggleTheme}
