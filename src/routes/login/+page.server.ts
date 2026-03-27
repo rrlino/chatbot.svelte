@@ -1,7 +1,7 @@
 import { fail, redirect } from '@sveltejs/kit';
 import type { PageServerLoad, Actions } from './$types';
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api/v1';
+const API_BASE = process.env.API_BASE_URL || import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api/v1';
 
 export const load: PageServerLoad = async ({ cookies }) => {
 	const token = cookies.get('authToken');
