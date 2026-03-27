@@ -46,13 +46,15 @@
 			if (params.search) qs.set('search', params.search);
 			if (filterQuestionTag) qs.set('question_tag', filterQuestionTag);
 
-			const response = await apiFetch<{ data: JourneyResponse[]; total?: number }>(
-				`${endpoints.journeys.progressAll}?${qs.toString()}`
+			const response = await apiFetch<Record<string, unknown>>(
+				`${endpoints.journeyAssignments.list}?${qs.toString()}`
 			);
 
-			const data = response.data ?? response;
-			responses = Array.isArray(data) ? data : [];
-			table.setTotalItems(response.total ?? responses.length);
+			let list = (response as Record<string, unknown>).items ?? response.data ?? response;
+			list = Array.isArray(list) ? list : [];
+
+			responses = list as JourneyResponse[];
+			table.setTotalItems((response as Record<string, unknown>).count as number ?? (response as Record<string, unknown>).total as number ?? list.length);
 		} catch (err: unknown) {
 			error = err instanceof Error ? err.message : 'Failed to load journey responses';
 		} finally {

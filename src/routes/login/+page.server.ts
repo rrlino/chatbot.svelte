@@ -2,6 +2,11 @@ import { fail, redirect } from '@sveltejs/kit';
 import type { PageServerLoad, Actions } from './$types';
 
 const API_BASE = process.env.API_BASE_URL || import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api/v1';
+const API_ORIGIN = API_BASE.replace(/\/api\/v\d+$/, '');
+
+function resolveApiUrl(endpoint: string): string {
+	return endpoint.startsWith('/api/') ? `${API_ORIGIN}${endpoint}` : `${API_BASE}${endpoint}`;
+}
 
 export const load: PageServerLoad = async ({ cookies }) => {
 	const token = cookies.get('authToken');
@@ -21,7 +26,7 @@ export const actions: Actions = {
 		}
 
 		try {
-			const response = await fetch(`${API_BASE}/auth/login`, {
+			const response = await fetch(resolveApiUrl('/auth/login'), {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ username, password })

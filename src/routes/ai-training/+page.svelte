@@ -85,9 +85,10 @@
 
 	async function fetchAIHealth() {
 		try {
-			const response = await apiFetch<{ data: { status: string } }>(endpoints.ai.health);
+			const response = await apiFetch<{ status: string }>(endpoints.ai.health);
 			const data = response.data ?? response;
-			aiHealth = (data as Record<string, unknown>).status as string ?? 'unknown';
+			const s = (data as Record<string, unknown>).status as string ?? 'unknown';
+			aiHealth = s === 'ok' ? 'healthy' : s;
 		} catch { aiHealth = 'unavailable'; }
 	}
 

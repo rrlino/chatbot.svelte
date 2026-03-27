@@ -54,17 +54,6 @@ export const integrationsMenu: DropdownMenu = {
 	]
 };
 
-export const fitnessMenu: DropdownMenu = {
-	label: 'Fitness',
-	icon: 'heart-pulse',
-	items: [
-		{ label: 'Exercises', href: '/fitness-exercises', icon: 'dumbbell' },
-		{ label: 'Training Sets', href: '/fitness-training-sets', icon: 'bar-chart-steps' },
-		{ label: 'PARQ', href: '/fitness-parq', icon: 'clipboard2-pulse' },
-		{ label: 'PARQ Alt', href: '/fitness-parq-alt', icon: 'clipboard2-heart' }
-	]
-};
-
 export const aiMenu: DropdownMenu = {
 	label: 'AI',
 	icon: 'cpu',
@@ -73,4 +62,4 @@ export const aiMenu: DropdownMenu = {
 	]
 };
 
-export const allMenus: DropdownMenu[] = [chatbotMenu, systemMenu, integrationsMenu, fitnessMenu, aiMenu];
+export const allMenus: DropdownMenu[] = [chatbotMenu, systemMenu, integrationsMenu, aiMenu];

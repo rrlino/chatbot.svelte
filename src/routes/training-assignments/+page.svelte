@@ -57,16 +57,16 @@
 			qs.set('offset', String((params.page - 1) * params.per_page));
 			if (params.search) qs.set('search', params.search);
 
-			const response = await apiFetch<{ data: JourneyAssignment[]; total?: number }>(
+			const response = await apiFetch<Record<string, unknown>>(
 				`${endpoints.journeyAssignments.list}?${qs.toString()}`
 			);
 
-			let data = response.data ?? response;
-			let list = Array.isArray(data) ? data : [];
-			if (filterStatus) list = list.filter((a) => a.status === filterStatus);
+			let list = (response as Record<string, unknown>).items ?? response.data ?? response;
+			list = Array.isArray(list) ? list : [];
+			if (filterStatus) list = (list as JourneyAssignment[]).filter((a) => a.status === filterStatus);
 
-			assignments = list;
-			table.setTotalItems(response.total ?? list.length);
+			assignments = list as JourneyAssignment[];
+			table.setTotalItems((response as Record<string, unknown>).count as number ?? (response as Record<string, unknown>).total as number ?? list.length);
 		} catch (err: unknown) {
 			error = err instanceof Error ? err.message : 'Failed to load assignments';
 		} finally {

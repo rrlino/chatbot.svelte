@@ -79,20 +79,20 @@ export const endpoints = {
 		checkExpiry: '/journeys/check-expiry'
 	},
 	journeyAssignments: {
-		list: '/journey-assignments',
-		get: (id: string) => `/journey-assignments/${id}`,
-		start: '/journey-assignments/start',
-		active: (userId: string) => `/journey-assignments/active/${userId}`,
-		answer: '/journey-assignments/answer',
-		batchAnswers: '/journey-assignments/batch-answers',
-		nextQuestion: (assignmentId: string) => `/journey-assignments/next-question/${assignmentId}`,
-		pause: (assignmentId: string) => `/journey-assignments/${assignmentId}/pause`,
-		resume: (assignmentId: string) => `/journey-assignments/${assignmentId}/resume`,
-		complete: (assignmentId: string) => `/journey-assignments/${assignmentId}/complete`,
-		userHistory: (userId: string) => `/journey-assignments/user/${userId}`,
-		userList: (userId: string) => `/journey-assignments/user/${userId}`,
-		stats: '/journey-assignments/stats',
-		expireOld: '/journey-assignments/expire-old'
+		list: '/api/journey-assignments',
+		get: (id: string) => `/api/journey-assignments/${id}`,
+		start: '/api/journey-assignments/start',
+		active: (userId: string) => `/api/journey-assignments/active/${userId}`,
+		answer: '/api/journey-assignments/answer',
+		batchAnswers: '/api/journey-assignments/batch-answers',
+		nextQuestion: (assignmentId: string) => `/api/journey-assignments/next-question/${assignmentId}`,
+		pause: (assignmentId: string) => `/api/journey-assignments/${assignmentId}/pause`,
+		resume: (assignmentId: string) => `/api/journey-assignments/${assignmentId}/resume`,
+		complete: (assignmentId: string) => `/api/journey-assignments/${assignmentId}/complete`,
+		userHistory: (userId: string) => `/api/journey-assignments/user/${userId}/history`,
+		userList: (userId: string) => `/api/journey-assignments/user/${userId}`,
+		stats: '/api/journey-assignments/stats',
+		expireOld: '/api/journey-assignments/expire-old'
 	},
 	variables: {
 		definitions: '/var-definitions',
@@ -106,13 +106,6 @@ export const endpoints = {
 		comorbidities: (userId: string) => `/variables/users/${userId}/comorbidities`,
 		exportByTag: (tag: string) => `/variables/${tag}/users/export`
 	},
-	fitness: {
-		exercises: '/fitness/exercises',
-		exercise: (id: string) => `/fitness/exercises/${id}`,
-		trainingSets: '/fitness/training-sets',
-		trainingSet: (id: string) => `/fitness/training-sets/${id}`,
-		assignments: '/fitness/assignments'
-	},
 	settings: {
 		list: '/settings',
 		get: (key: string) => `/settings/${key}`,
@@ -122,15 +115,15 @@ export const endpoints = {
 	},
 	system: {
 		settings: '/system/settings',
-		version: '/system/version',
-		upgrade: '/system/upgrade'
+		version: '/api/health/detailed',
+		upgrade: '/api/health/detailed'
 	},
 	security: {
-		status: '/security/status'
+		status: '/api/security/status'
 	},
 	webhooks: {
 		whatsappVerify: '/v1/webhooks/whatsapp',
-		simulate: '/send-webhook',
+		simulate: '/api/send-webhook',
 		status: '/webhooks/status',
 		mercadopago: '/webhooks/mercadopago',
 		getnet: '/webhooks/getnet',
@@ -142,27 +135,27 @@ export const endpoints = {
 		messages: '/whatsapp/messages'
 	},
 	jobs: {
-		list: '/jobs',
-		get: (id: string) => `/jobs/${id}`,
-		create: '/jobs',
-		process: (id: string) => `/job-queue/${id}/process`,
-		worker: '/job-queue/worker'
+		list: '/api/job-queue',
+		get: (id: string) => `/api/job-queue/${id}`,
+		create: '/api/job-queue',
+		process: (id: string) => `/api/job-queue/${id}/process`,
+		worker: '/api/job-queue/worker'
 	},
 	audit: {
-		list: '/audit'
+		list: '/api/audit'
 	},
 	analytics: {
 		metrics: '/analytics/metrics'
 	},
 	ai: {
-		chatbotResponse: '/ai/chatbot-response',
-		parseJourneyBatch: '/ai/parse-journey-batch',
-		conversationSummary: '/ai/conversation-summary',
-		validateConfig: '/ai/validate-config',
-		clearCache: '/ai/clear-cache',
-		testResponse: '/ai/test-response',
-		testBatchParsing: '/ai/test-batch-parsing',
-		health: '/ai/health'
+		chatbotResponse: '/api/ai/chatbot-response',
+		parseJourneyBatch: '/api/ai/parse-journey-batch',
+		conversationSummary: '/api/ai/conversation-summary',
+		validateConfig: '/api/ai/validate-config',
+		clearCache: '/api/ai/clear-cache',
+		testResponse: '/api/ai/test-response',
+		testBatchParsing: '/api/ai/test-batch-parsing',
+		health: '/api/ai/health'
 	},
 	billing: {
 		plans: '/billing/plans',
@@ -176,10 +169,10 @@ export const endpoints = {
 		portal: '/billing/portal'
 	},
 	health: {
-		check: '/health',
-		detailed: '/health/detailed',
-		metrics: '/metrics',
-		metricsReset: '/metrics/reset',
-		routes: '/routes'
+		check: '/api/health',
+		detailed: '/api/health/detailed',
+		metrics: '/api/metrics',
+		metricsReset: '/api/metrics/reset',
+		routes: '/api/routes'
 	}
 } as const;

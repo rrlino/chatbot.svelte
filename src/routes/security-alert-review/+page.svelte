@@ -60,8 +60,8 @@
 
 	async function fetchSecurityStatus() {
 		try {
-			const response = await apiFetch<{ data: SecurityStatus }>(endpoints.security.status);
-			securityStatus = response.data ?? response;
+			const response = await apiFetch<Record<string, unknown>>(endpoints.security.status);
+			securityStatus = (response.data ?? response) as SecurityStatus;
 		} catch { securityStatus = null; }
 	}
 
@@ -74,18 +74,18 @@
 			qs.set('offset', String((params.page - 1) * params.per_page));
 			if (params.search) qs.set('search', params.search);
 
-			const response = await apiFetch<{ data: SecurityEvent[]; total?: number }>(
-				`/audit?${qs.toString()}`
+			const response = await apiFetch<unknown>(
+				`${endpoints.audit.list}?${qs.toString()}`
 			);
 
-			let data = response.data ?? response;
-			let list = Array.isArray(data) ? data : [];
+			let list = Array.isArray(response) ? response : (response as Record<string, unknown>).data ?? [];
+			list = Array.isArray(list) ? list : [];
 			if (filterSeverity) list = list.filter((e) => e.severity === filterSeverity);
 			if (filterReviewed === 'reviewed') list = list.filter((e) => e.reviewed);
 			if (filterReviewed === 'unreviewed') list = list.filter((e) => !e.reviewed);
 
-			events = list;
-			table.setTotalItems(response.total ?? list.length);
+			events = list as SecurityEvent[];
+			table.setTotalItems(Array.isArray(response) ? list.length : ((response as Record<string, unknown>).total as number ?? list.length));
 		} catch (err: unknown) {
 			error = err instanceof Error ? err.message : 'Failed to load security events';
 		} finally {

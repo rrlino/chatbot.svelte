@@ -1,6 +1,7 @@
 const API_URL = typeof import.meta !== 'undefined' && typeof import.meta.env !== 'undefined'
 	? (import.meta.env.VITE_API_BASE_URL || '')
 	: '';
+const API_ORIGIN = API_URL.replace(/\/api\/v\d+$/, '');
 
 function parseErrorMessage(body: string): string {
 	try {
@@ -35,8 +36,12 @@ export class ApiError extends Error {
 	}
 }
 
+// Paths that are root-level on the backend (not under /api/v1/)
+const ROOT_PATHS = ['/api/', '/webhooks/'];
+
 export async function apiFetch<T = unknown>(endpoint: string, options: RequestInit = {}): Promise<T> {
-	const url = `${API_URL}${endpoint}`;
+	const useOrigin = ROOT_PATHS.some((p) => endpoint.startsWith(p));
+	const url = useOrigin ? `${API_ORIGIN}${endpoint}` : `${API_URL}${endpoint}`;
 	const token = typeof localStorage !== 'undefined' ? localStorage.getItem('authToken') : null;
 
 	const response = await fetch(url, {

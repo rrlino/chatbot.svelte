@@ -6,6 +6,7 @@
 	import type { FetchParams } from '$lib/composables/useTable';
 	import { apiFetch, ApiError } from '$utils/api';
 	import { toast } from '$lib/stores/toast';
+	import { endpoints } from '$config/endpoints';
 	import type { Column } from '$components/core/AppTable.svelte';
 
 	interface Notification {
@@ -51,26 +52,27 @@
 			qs.set('offset', String((params.page - 1) * params.per_page));
 			if (params.search) qs.set('search', params.search);
 
-			const response = await apiFetch<{ data: Notification[]; total?: number }>(
-				`/audit?${qs.toString()}`
+			const response = await apiFetch<unknown>(
+				`${endpoints.audit.list}?${qs.toString()}`
 			);
 
-			let data = response.data ?? response;
-			let list = Array.isArray(data) ? data.map((item) => ({
+			let raw = Array.isArray(response) ? response : ((response as Record<string, unknown>).data ?? []);
+			raw = Array.isArray(raw) ? raw : [];
+			let list = raw.map((item: Record<string, unknown>) => ({
 				...item,
 				type: item.action_type || item.type || 'system',
-				title: item.description?.slice(0, 50) || item.title || 'Notification',
+				title: (item.description as string)?.slice(0, 50) || item.title || 'Notification',
 				message: item.description || item.message || '',
 				is_read: item.reviewed ?? item.is_read ?? true,
 				severity: item.severity || 'info'
-			})) : [];
+			}));
 
 			if (filterRead === 'unread') list = list.filter((n) => !n.is_read);
 			if (filterRead === 'read') list = list.filter((n) => n.is_read);
 
-			unreadCount = list.filter((n) => !n.is_read).length;
-			notifications = list;
-			table.setTotalItems(response.total ?? list.length);
+			unreadCount = list.filter((n: Notification) => !n.is_read).length;
+			notifications = list as Notification[];
+			table.setTotalItems(Array.isArray(response) ? list.length : ((response as Record<string, unknown>).total as number ?? list.length));
 		} catch (err: unknown) {
 			if (err instanceof ApiError && err.status === 404) {
 				notifications = []; table.setTotalItems(0);
