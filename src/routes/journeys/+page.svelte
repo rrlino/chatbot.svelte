@@ -175,18 +175,23 @@
 	}
 
 	async function confirmDelete() {
+		if (!selectedJourney) {
+			showDeleteModal = false;
+			return;
+		}
+
 		deleting = true;
 		try {
-			if (editingQuestion && selectedJourney) {
+			if (editingQuestion) {
 				// Delete question
 				await apiFetch(endpoints.journeys.question(selectedJourney.id.toString(), editingQuestion.id.toString()), { method: 'DELETE' });
-				questionsCache[selectedJourney.id] = getQuestions(selectedJourney.id).filter(q => q.id !== editingQuestion.id);
+				questionsCache[selectedJourney.id] = getQuestions(selectedJourney.id).filter(q => q.id !== editingQuestion!.id);
 				questionsCache = { ...questionsCache };
 				toast.success('Question deleted');
-			} else if (selectedJourney) {
+			} else {
 				// Delete journey
 				await apiFetch(endpoints.journeys.delete(selectedJourney.id.toString()), { method: 'DELETE' });
-				journeys = journeys.filter((j) => j.id !== selectedJourney.id);
+				journeys = journeys.filter((j) => j.id !== selectedJourney!.id);
 				toast.success('Journey deleted');
 			}
 			showDeleteModal = false;
@@ -316,7 +321,7 @@
 			{#each journeys as journey (journey.id)}
 				<div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden {expandedJourneys.has(journey.id) ? 'ring-1 ring-blue-200' : ''}">
 					<!-- Journey Header -->
-					<div class="flex items-center justify-between px-4 py-3 hover:bg-gray-50 cursor-pointer" onclick={() => toggleJourney(journey.id)}>
+					<div class="flex items-center justify-between px-4 py-3 hover:bg-gray-50 cursor-pointer" role="button" tabindex="0" onclick={() => toggleJourney(journey.id)} onkeydown={(e) => e.key === 'Enter' && toggleJourney(journey.id)}>
 						<div class="flex items-center gap-3">
 							{#if expandedJourneys.has(journey.id)}
 								<ChevronDown class="h-4 w-4 text-gray-400" />
@@ -333,7 +338,7 @@
 								<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">Inactive</span>
 							{/if}
 						</div>
-						<div class="flex items-center gap-1" onclick={(e) => e.stopPropagation()}>
+						<div class="flex items-center gap-1" role="toolbar" tabindex="-1" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()}>
 							<button onclick={() => openAddQuestionModal(journey)} class="p-1.5 text-green-600 hover:bg-green-50 rounded transition-colors" title="Add Question">
 								<Plus class="h-4 w-4" />
 							</button>
