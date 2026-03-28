@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { Plus, ChevronRight, ChevronDown, Pencil, Trash2, ToggleLeft, ToggleRight, X, Signpost } from 'lucide-svelte';
+	import { page } from '$app/state';
+	import { enhance } from '$app/forms';
+	import { Plus, ChevronRight, ChevronDown, Pencil, Trash2, ToggleLeft, ToggleRight, Signpost, ExternalLink } from 'lucide-svelte';
 	import { apiFetch } from '$utils/api';
 	import { toast } from '$stores/toast';
 	import { endpoints } from '$config/endpoints';
@@ -35,7 +37,6 @@
 
 	let loading = $state(false);
 	let saving = $state(false);
-	let deleting = $state(false);
 	let journeys = $state<Journey[]>([]);
 	let expandedJourneys = $state<Set<number>>(new Set());
 	let expandedQuestions = $state<Set<number>>(new Set());
@@ -61,6 +62,29 @@
 	const activeJourneys = $derived(journeys.filter((j) => j.is_active).length);
 	const totalUsers = $derived(journeys.reduce((sum, j) => sum + (j.total_assignments || 0), 0));
 	const showOptionsEditor = $derived(questionForm.question_type === 'choice');
+
+	// Handle form action results from server
+	$effect(() => {
+		const formResult = page.form;
+		if (formResult?.success && formResult.action) {
+			if (formResult.action === 'create') {
+				toast.success('Journey created');
+				loadJourneys();
+			} else if (formResult.action === 'update') {
+				toast.success('Journey updated');
+				loadJourneys();
+			} else if (formResult.action === 'delete') {
+				toast.success('Journey deleted');
+				loadJourneys();
+			} else if (formResult.action === 'toggle') {
+				toast.success('Journey status toggled');
+				loadJourneys();
+			}
+		}
+		if (formResult?.error) {
+			toast.error(formResult.error as string);
+		}
+	});
 
 	function toggleJourney(id: number) {
 		const next = new Set(expandedJourneys);
@@ -125,7 +149,7 @@
 		return badges[type] || 'bg-gray-100 text-gray-700';
 	}
 
-	// Journey CRUD
+	// Journey modals
 	function openCreateJourneyModal() {
 		editingJourney = null;
 		journeyForm = { id: null, code: '', name: '', description: '', is_active: true, is_mandatory: false };
@@ -138,71 +162,14 @@
 		showJourneyModal = true;
 	}
 
-	async function saveJourney() {
-		saving = true;
-		try {
-			if (editingJourney) {
-				await apiFetch(endpoints.journeys.update(editingJourney.id.toString()), { method: 'PUT', body: JSON.stringify(journeyForm) });
-				toast.success('Journey updated');
-			} else {
-				await apiFetch(endpoints.journeys.create, { method: 'POST', body: JSON.stringify(journeyForm) });
-				toast.success('Journey created');
-			}
-			showJourneyModal = false;
-			await loadJourneys();
-		} catch {
-			toast.error('Failed to save journey');
-		} finally {
-			saving = false;
-		}
-	}
-
-	async function toggleJourneyStatus(journey: Journey) {
-		try {
-			await apiFetch(endpoints.journeys.update(journey.id.toString()), { method: 'PUT', body: JSON.stringify({ ...journey, is_active: !journey.is_active }) });
-			journey.is_active = !journey.is_active;
-			journeys = [...journeys];
-			toast.success(journey.is_active ? 'Journey activated' : 'Journey deactivated');
-		} catch {
-			toast.error('Failed to toggle journey status');
-		}
-	}
-
 	function confirmDeleteJourney(journey: Journey) {
 		deleteTarget = { name: journey.name };
-		showDeleteModal = true;
+		editingQuestion = null;
 		selectedJourney = journey;
+		showDeleteModal = true;
 	}
 
-	async function confirmDelete() {
-		if (!selectedJourney) {
-			showDeleteModal = false;
-			return;
-		}
-
-		deleting = true;
-		try {
-			if (editingQuestion) {
-				// Delete question
-				await apiFetch(endpoints.journeys.question(selectedJourney.id.toString(), editingQuestion.id.toString()), { method: 'DELETE' });
-				questionsCache[selectedJourney.id] = getQuestions(selectedJourney.id).filter(q => q.id !== editingQuestion!.id);
-				questionsCache = { ...questionsCache };
-				toast.success('Question deleted');
-			} else {
-				// Delete journey
-				await apiFetch(endpoints.journeys.delete(selectedJourney.id.toString()), { method: 'DELETE' });
-				journeys = journeys.filter((j) => j.id !== selectedJourney!.id);
-				toast.success('Journey deleted');
-			}
-			showDeleteModal = false;
-		} catch {
-			toast.error(editingQuestion ? 'Failed to delete question' : 'Failed to delete journey');
-		} finally {
-			deleting = false;
-		}
-	}
-
-	// Question CRUD
+	// Question CRUD (still client-side since questions are loaded per-journey in the expandable view)
 	function openAddQuestionModal(journey: Journey) {
 		selectedJourney = journey;
 		editingQuestion = null;
@@ -230,7 +197,7 @@
 			}
 			showQuestionModal = false;
 			if (selectedJourney) {
-				questionsCache[selectedJourney.id] = [];
+				delete questionsCache[selectedJourney.id];
 				questionsCache = { ...questionsCache };
 				await loadQuestions(selectedJourney.id);
 			}
@@ -257,6 +224,29 @@
 		selectedJourney = journey;
 		editingQuestion = question;
 		showDeleteModal = true;
+	}
+
+	async function confirmDelete() {
+		if (!selectedJourney) {
+			showDeleteModal = false;
+			return;
+		}
+
+		try {
+			if (editingQuestion) {
+				await apiFetch(endpoints.journeys.question(selectedJourney.id.toString(), editingQuestion.id.toString()), { method: 'DELETE' });
+				questionsCache[selectedJourney.id] = getQuestions(selectedJourney.id).filter(q => q.id !== editingQuestion!.id);
+				questionsCache = { ...questionsCache };
+				toast.success('Question deleted');
+			} else {
+				await apiFetch(endpoints.journeys.delete(selectedJourney.id.toString()), { method: 'DELETE' });
+				journeys = journeys.filter((j) => j.id !== selectedJourney!.id);
+				toast.success('Journey deleted');
+			}
+			showDeleteModal = false;
+		} catch {
+			toast.error(editingQuestion ? 'Failed to delete question' : 'Failed to delete journey');
+		}
 	}
 
 	function addOption() {
@@ -339,19 +329,27 @@
 							{/if}
 						</div>
 						<div class="flex items-center gap-1" role="toolbar" tabindex="-1" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()}>
+							<a href="/journeys/{journey.id}" class="p-1.5 text-gray-500 hover:bg-gray-50 rounded transition-colors" title="View Details">
+								<ExternalLink class="h-4 w-4" />
+							</a>
 							<button onclick={() => openAddQuestionModal(journey)} class="p-1.5 text-green-600 hover:bg-green-50 rounded transition-colors" title="Add Question">
 								<Plus class="h-4 w-4" />
 							</button>
 							<button onclick={() => openEditJourneyModal(journey)} class="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors" title="Edit">
 								<Pencil class="h-4 w-4" />
 							</button>
-							<button onclick={() => toggleJourneyStatus(journey)} class="p-1.5 rounded transition-colors" title="Toggle Active">
-								{#if journey.is_active}
-									<ToggleRight class="h-4 w-4 text-green-600" />
-								{:else}
-									<ToggleLeft class="h-4 w-4 text-gray-400" />
-								{/if}
-							</button>
+							<!-- Toggle via form action -->
+							<form method="POST" action="?/toggle" use:enhance class="contents">
+								<input type="hidden" name="id" value={journey.id} />
+								<input type="hidden" name="is_active" value={String(journey.is_active)} />
+								<button type="submit" class="p-1.5 rounded transition-colors" title="Toggle Active">
+									{#if journey.is_active}
+										<ToggleRight class="h-4 w-4 text-green-600" />
+									{:else}
+										<ToggleLeft class="h-4 w-4 text-gray-400" />
+									{/if}
+								</button>
+							</form>
 							<button onclick={() => confirmDeleteJourney(journey)} disabled={journey.is_active} class="p-1.5 text-red-500 hover:bg-red-50 rounded transition-colors disabled:opacity-30" title="Delete">
 								<Trash2 class="h-4 w-4" />
 							</button>
@@ -366,7 +364,10 @@
 							{:else if getQuestions(journey.id).length === 0}
 								<div class="text-center py-4 text-sm text-gray-400">
 									<p>No questions yet</p>
-									<button onclick={() => openAddQuestionModal(journey)} class="mt-2 text-blue-600 hover:underline text-sm">Add First Question</button>
+									<div class="flex items-center justify-center gap-3 mt-2">
+										<button onclick={() => openAddQuestionModal(journey)} class="text-blue-600 hover:underline text-sm">Add First Question</button>
+										<a href="/journeys/{journey.id}" class="text-gray-500 hover:text-gray-700 text-sm">View Details</a>
+									</div>
 								</div>
 							{:else}
 								<div class="space-y-2">
@@ -426,6 +427,9 @@
 										</div>
 									{/each}
 								</div>
+								<div class="mt-3 text-center">
+									<a href="/journeys/{journey.id}" class="text-sm text-blue-600 hover:underline">View full details</a>
+								</div>
 							{/if}
 						</div>
 					{/if}
@@ -440,36 +444,50 @@
 	{/if}
 </div>
 
-<!-- Journey Modal -->
+<!-- Journey Create/Edit Modal — uses form action -->
 <AppModal open={showJourneyModal} title={editingJourney ? 'Edit Journey' : 'Create New Journey'} onClose={() => (showJourneyModal = false)}>
-	<div class="space-y-4">
-		<div>
-			<p class="block text-sm font-medium text-gray-700 mb-1">Journey Code *</p>
-			<input type="text" bind:value={journeyForm.code} disabled={!!editingJourney} placeholder="onboarding" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50" />
-			<p class="text-xs text-gray-400 mt-1">{editingJourney ? 'Cannot be changed' : 'Lowercase, no spaces'}</p>
+	<form
+		method="POST"
+		action={editingJourney ? '?/update' : '?/create'}
+		use:enhance={() => {
+			return ({ update }) => {
+				update({ reset: false });
+				showJourneyModal = false;
+			};
+		}}
+	>
+		<div class="space-y-4">
+			{#if editingJourney}
+				<input type="hidden" name="id" value={editingJourney.id} />
+			{/if}
+			<div>
+				<p class="block text-sm font-medium text-gray-700 mb-1">Journey Code *</p>
+				<input type="text" name="code" value={journeyForm.code} disabled={!!editingJourney} placeholder="onboarding" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50" />
+				<p class="text-xs text-gray-400 mt-1">{editingJourney ? 'Cannot be changed' : 'Lowercase, no spaces'}</p>
+			</div>
+			<div>
+				<p class="block text-sm font-medium text-gray-700 mb-1">Journey Name *</p>
+				<input type="text" name="name" value={journeyForm.name} placeholder="Onboarding Journey" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+			</div>
+			<div>
+				<p class="block text-sm font-medium text-gray-700 mb-1">Description</p>
+				<textarea name="description" rows="3" placeholder="Describe this journey..." class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">{journeyForm.description}</textarea>
+			</div>
+			<div class="flex items-center gap-6">
+				<label class="flex items-center gap-2 text-sm"><input type="checkbox" name="is_active" checked={journeyForm.is_active} class="rounded" /> Active</label>
+				<label class="flex items-center gap-2 text-sm"><input type="checkbox" name="is_mandatory" checked={journeyForm.is_mandatory} class="rounded" /> Auto-assign to users</label>
+			</div>
+			<div class="flex justify-end gap-2 pt-2">
+				<button type="button" onclick={() => (showJourneyModal = false)} class="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">Cancel</button>
+				<button type="submit" class="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+					{editingJourney ? 'Update' : 'Create'} Journey
+				</button>
+			</div>
 		</div>
-		<div>
-			<p class="block text-sm font-medium text-gray-700 mb-1">Journey Name *</p>
-			<input type="text" bind:value={journeyForm.name} placeholder="Onboarding Journey" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-		</div>
-		<div>
-			<p class="block text-sm font-medium text-gray-700 mb-1">Description</p>
-			<textarea bind:value={journeyForm.description} rows="3" placeholder="Describe this journey..." class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
-		</div>
-		<div class="flex items-center gap-6">
-			<label class="flex items-center gap-2 text-sm"><input type="checkbox" bind:checked={journeyForm.is_active} class="rounded" /> Active</label>
-			<label class="flex items-center gap-2 text-sm"><input type="checkbox" bind:checked={journeyForm.is_mandatory} class="rounded" /> Auto-assign to users</label>
-		</div>
-		<div class="flex justify-end gap-2 pt-2">
-			<button onclick={() => (showJourneyModal = false)} class="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">Cancel</button>
-			<button onclick={saveJourney} disabled={saving} class="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors">
-				{saving ? 'Saving...' : editingJourney ? 'Update' : 'Create'} Journey
-			</button>
-		</div>
-	</div>
+	</form>
 </AppModal>
 
-<!-- Question Modal -->
+<!-- Question Modal (client-side for inline expandable view) -->
 <AppModal open={showQuestionModal} title={editingQuestion ? 'Edit Question' : 'Add Question'} onClose={() => (showQuestionModal = false)}>
 	<div class="space-y-4">
 		<p class="text-xs text-gray-400">Journey: {selectedJourney?.name}</p>
@@ -502,11 +520,11 @@
 							<span class="text-xs text-gray-400 w-5 text-center">{idx + 1}</span>
 							<input type="text" bind:value={option.label} placeholder="Display text" class="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
 							<input type="text" bind:value={option.value} placeholder="Value" class="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-							<button onclick={() => removeOption(idx)} disabled={questionForm.options.length <= 1} class="p-1.5 text-red-500 hover:bg-red-50 rounded disabled:opacity-30"><Trash2 class="h-3.5 w-3.5" /></button>
+							<button type="button" onclick={() => removeOption(idx)} disabled={questionForm.options.length <= 1} class="p-1.5 text-red-500 hover:bg-red-50 rounded disabled:opacity-30"><Trash2 class="h-3.5 w-3.5" /></button>
 						</div>
 					{/each}
 				</div>
-				<button onclick={addOption} class="mt-2 flex items-center gap-1 text-sm text-blue-600 hover:underline"><Plus class="h-3.5 w-3.5" /> Add Option</button>
+				<button type="button" onclick={addOption} class="mt-2 flex items-center gap-1 text-sm text-blue-600 hover:underline"><Plus class="h-3.5 w-3.5" /> Add Option</button>
 			</div>
 		{/if}
 
@@ -533,19 +551,45 @@
 	</div>
 </AppModal>
 
-<!-- Delete Confirmation Modal -->
+<!-- Delete Confirmation Modal — uses form action for journeys, client-side for questions -->
 <AppModal open={showDeleteModal} title="Confirm Delete" onClose={() => (showDeleteModal = false)}>
-	<div class="space-y-3">
-		<p class="text-sm text-gray-600">Are you sure you want to delete this item?</p>
-		<div class="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-			<p class="text-sm font-semibold text-yellow-800">{deleteTarget?.name}</p>
+	{#if editingQuestion}
+		<!-- Question delete: client-side -->
+		<div class="space-y-3">
+			<p class="text-sm text-gray-600">Are you sure you want to delete this question?</p>
+			<div class="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+				<p class="text-sm font-semibold text-yellow-800">{deleteTarget?.name}</p>
+			</div>
+			<p class="text-sm text-red-600">This action cannot be undone.</p>
+			<div class="flex justify-end gap-2 pt-2">
+				<button onclick={() => (showDeleteModal = false)} class="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">Cancel</button>
+				<button onclick={confirmDelete} class="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors">Delete</button>
+			</div>
 		</div>
-		<p class="text-sm text-red-600">This action cannot be undone.</p>
-		<div class="flex justify-end gap-2 pt-2">
-			<button onclick={() => (showDeleteModal = false)} class="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">Cancel</button>
-			<button onclick={confirmDelete} disabled={deleting} class="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 transition-colors">
-				{deleting ? 'Deleting...' : 'Delete'}
-			</button>
-		</div>
-	</div>
+	{:else}
+		<!-- Journey delete: form action -->
+		<form
+			method="POST"
+			action="?/delete"
+			use:enhance={() => {
+				return ({ update }) => {
+					update({ reset: false });
+					showDeleteModal = false;
+				};
+			}}
+		>
+			<div class="space-y-3">
+				<input type="hidden" name="id" value={selectedJourney?.id} />
+				<p class="text-sm text-gray-600">Are you sure you want to delete this journey?</p>
+				<div class="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+					<p class="text-sm font-semibold text-yellow-800">{deleteTarget?.name}</p>
+				</div>
+				<p class="text-sm text-red-600">This action cannot be undone.</p>
+				<div class="flex justify-end gap-2 pt-2">
+					<button type="button" onclick={() => (showDeleteModal = false)} class="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">Cancel</button>
+					<button type="submit" class="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors">Delete</button>
+				</div>
+			</div>
+		</form>
+	{/if}
 </AppModal>
