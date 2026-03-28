@@ -98,11 +98,9 @@
 		loadingQuestions[journeyId] = true;
 		loadingQuestions = { ...loadingQuestions };
 		try {
-			const response = await apiFetch<{ data: JourneyQuestion[] } | JourneyQuestion[]>(endpoints.journeys.questions);
+			const response = await apiFetch<{ data: JourneyQuestion[] } | JourneyQuestion[]>(endpoints.journeys.questions(journeyId.toString()));
 			const data = Array.isArray(response) ? response : response.data ?? [];
-			questionsCache[journeyId] = data.filter(
-				(q: JourneyQuestion) => q /* API may return all; filter client-side if needed */
-			);
+			questionsCache[journeyId] = data;
 			questionsCache = { ...questionsCache };
 		} catch {
 			questionsCache[journeyId] = [];
@@ -144,10 +142,10 @@
 		saving = true;
 		try {
 			if (editingJourney) {
-				await apiFetch(endpoints.journeys.list, { method: 'PUT', body: JSON.stringify(journeyForm) });
+				await apiFetch(endpoints.journeys.update(editingJourney.id.toString()), { method: 'PUT', body: JSON.stringify(journeyForm) });
 				toast.success('Journey updated');
 			} else {
-				await apiFetch(endpoints.journeys.list, { method: 'POST', body: JSON.stringify(journeyForm) });
+				await apiFetch(endpoints.journeys.create, { method: 'POST', body: JSON.stringify(journeyForm) });
 				toast.success('Journey created');
 			}
 			showJourneyModal = false;
@@ -161,7 +159,7 @@
 
 	async function toggleJourneyStatus(journey: Journey) {
 		try {
-			await apiFetch(endpoints.journeys.list, { method: 'PUT', body: JSON.stringify({ ...journey, is_active: !journey.is_active }) });
+			await apiFetch(endpoints.journeys.update(journey.id.toString()), { method: 'PUT', body: JSON.stringify({ ...journey, is_active: !journey.is_active }) });
 			journey.is_active = !journey.is_active;
 			journeys = [...journeys];
 			toast.success(journey.is_active ? 'Journey activated' : 'Journey deactivated');
@@ -177,15 +175,23 @@
 	}
 
 	async function confirmDelete() {
-		if (!selectedJourney) return;
 		deleting = true;
 		try {
-			await apiFetch(endpoints.journeys.list, { method: 'DELETE' });
-			journeys = journeys.filter((j) => j.id !== selectedJourney.id);
+			if (editingQuestion && selectedJourney) {
+				// Delete question
+				await apiFetch(endpoints.journeys.question(selectedJourney.id.toString(), editingQuestion.id.toString()), { method: 'DELETE' });
+				questionsCache[selectedJourney.id] = getQuestions(selectedJourney.id).filter(q => q.id !== editingQuestion.id);
+				questionsCache = { ...questionsCache };
+				toast.success('Question deleted');
+			} else if (selectedJourney) {
+				// Delete journey
+				await apiFetch(endpoints.journeys.delete(selectedJourney.id.toString()), { method: 'DELETE' });
+				journeys = journeys.filter((j) => j.id !== selectedJourney.id);
+				toast.success('Journey deleted');
+			}
 			showDeleteModal = false;
-			toast.success('Journey deleted');
 		} catch {
-			toast.error('Failed to delete journey');
+			toast.error(editingQuestion ? 'Failed to delete question' : 'Failed to delete journey');
 		} finally {
 			deleting = false;
 		}
@@ -211,10 +217,10 @@
 		try {
 			const payload = { ...questionForm, journey_id: selectedJourney?.id };
 			if (editingQuestion) {
-				await apiFetch(endpoints.journeys.questions, { method: 'PUT', body: JSON.stringify(payload) });
+				await apiFetch(endpoints.journeys.question(selectedJourney!.id.toString(), editingQuestion.id.toString()), { method: 'PUT', body: JSON.stringify(payload) });
 				toast.success('Question updated');
 			} else {
-				await apiFetch(endpoints.journeys.questions, { method: 'POST', body: JSON.stringify(payload) });
+				await apiFetch(endpoints.journeys.questions(selectedJourney!.id.toString()), { method: 'POST', body: JSON.stringify(payload) });
 				toast.success('Question created');
 			}
 			showQuestionModal = false;
@@ -232,7 +238,7 @@
 
 	async function toggleQuestionStatus(journey: Journey, question: JourneyQuestion) {
 		try {
-			await apiFetch(endpoints.journeys.questions, { method: 'PUT', body: JSON.stringify({ ...question, is_active: !question.is_active }) });
+			await apiFetch(endpoints.journeys.question(journey.id.toString(), question.id.toString()), { method: 'PUT', body: JSON.stringify({ ...question, is_active: !question.is_active }) });
 			question.is_active = !question.is_active;
 			questionsCache[journey.id] = [...getQuestions(journey.id)];
 			questionsCache = { ...questionsCache };
