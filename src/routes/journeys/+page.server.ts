@@ -1,6 +1,35 @@
 import { fail, redirect } from '@sveltejs/kit';
-import type { Actions } from './$types';
+import type { PageServerLoad, Actions } from './$types';
 import { API_BASE, authHeaders, extractApiError } from '$lib/server/api';
+
+export const load: PageServerLoad = async ({ cookies }) => {
+	const token = cookies.get('authToken');
+	if (!token) throw redirect(302, '/login');
+
+	const headers = authHeaders(token);
+
+	const journeysRes = await fetch(`${API_BASE}/journeys`, { headers });
+	if (!journeysRes.ok) throw redirect(302, '/login');
+
+	const journeysRaw = await journeysRes.json();
+	const journeys = (Array.isArray(journeysRaw) ? journeysRaw : ((journeysRaw as { data?: unknown[] }).data ?? [])) as { id: number }[];
+
+	// Batch-fetch questions for all journeys in parallel instead of N+1 per-expansion
+	const questionsByJourney: Record<number, unknown[]> = {};
+	await Promise.all(
+		journeys.map(async (journey) => {
+			try {
+				const res = await fetch(`${API_BASE}/journeys/${journey.id}/questions`, { headers });
+				const raw = await res.json();
+				questionsByJourney[journey.id] = Array.isArray(raw) ? raw : ((raw as { data?: unknown[] }).data ?? []);
+			} catch {
+				questionsByJourney[journey.id] = [];
+			}
+		})
+	);
+
+	return { journeys, questionsByJourney };
+};
 
 export const actions: Actions = {
 	create: async ({ request, cookies }) => {

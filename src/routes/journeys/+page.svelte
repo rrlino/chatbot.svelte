@@ -1,7 +1,7 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
 	import { page } from '$app/state';
 	import { enhance } from '$app/forms';
+	import { invalidateAll } from '$app/navigation';
 	import { Plus, ChevronRight, ChevronDown, Pencil, Trash2, ToggleLeft, ToggleRight, Signpost, ExternalLink } from 'lucide-svelte';
 	import { apiFetch } from '$utils/api';
 	import { toast } from '$stores/toast';
@@ -36,13 +36,13 @@
 		total_assignments?: number;
 	}
 
-	let loading = $state(false);
+	let { data } = $props();
+
 	let saving = $state(false);
-	let journeys = $state<Journey[]>([]);
+	let journeys = $state<Journey[]>(data.journeys as unknown as Journey[]);
 	let expandedJourneys = $state<Set<number>>(new Set());
 	let expandedQuestions = $state<Set<number>>(new Set());
-	let questionsCache = $state<Record<number, JourneyQuestion[]>>({});
-	let loadingQuestions = $state<Record<number, boolean>>({});
+	let questionsCache = $state<Record<number, JourneyQuestion[]>>(data.questionsByJourney as unknown as Record<number, JourneyQuestion[]>);
 
 	// Modals
 	let showJourneyModal = $state(false);
@@ -68,19 +68,14 @@
 	$effect(() => {
 		const formResult = page.form;
 		if (formResult?.success && formResult.action) {
-			if (formResult.action === 'create') {
-				toast.success('Journey created');
-				loadJourneys();
-			} else if (formResult.action === 'update') {
-				toast.success('Journey updated');
-				loadJourneys();
-			} else if (formResult.action === 'delete') {
-				toast.success('Journey deleted');
-				loadJourneys();
-			} else if (formResult.action === 'toggle') {
-				toast.success('Journey status toggled');
-				loadJourneys();
-			}
+			const messages: Record<string, string> = {
+				create: 'Journey created',
+				update: 'Journey updated',
+				delete: 'Journey deleted',
+				toggle: 'Journey status toggled'
+			};
+			toast.success(messages[formResult.action as string] || 'Done');
+			invalidateAll();
 		}
 		if (formResult?.error) {
 			toast.error(formResult.error as string);
@@ -93,7 +88,6 @@
 			next.delete(id);
 		} else {
 			next.add(id);
-			loadQuestions(id);
 		}
 		expandedJourneys = next;
 	}
@@ -103,37 +97,6 @@
 		if (next.has(id)) next.delete(id);
 		else next.add(id);
 		expandedQuestions = next;
-	}
-
-	async function loadJourneys() {
-		loading = true;
-		try {
-			const response = await apiFetch<{ data: Journey[] } | Journey[]>(endpoints.journeys.list);
-			const data = Array.isArray(response) ? response : response.data ?? [];
-			journeys = data;
-		} catch {
-			toast.error('Failed to load journeys');
-		} finally {
-			loading = false;
-		}
-	}
-
-	async function loadQuestions(journeyId: number) {
-		if (questionsCache[journeyId]) return;
-		loadingQuestions[journeyId] = true;
-		loadingQuestions = { ...loadingQuestions };
-		try {
-			const response = await apiFetch<{ data: JourneyQuestion[] } | JourneyQuestion[]>(endpoints.journeys.questions(journeyId.toString()));
-			const data = Array.isArray(response) ? response : response.data ?? [];
-			questionsCache[journeyId] = data;
-			questionsCache = { ...questionsCache };
-		} catch {
-			questionsCache[journeyId] = [];
-			questionsCache = { ...questionsCache };
-		} finally {
-			loadingQuestions[journeyId] = false;
-			loadingQuestions = { ...loadingQuestions };
-		}
 	}
 
 	function getQuestions(journeyId: number): JourneyQuestion[] {
@@ -187,11 +150,7 @@
 				toast.success('Question created');
 			}
 			showQuestionModal = false;
-			if (selectedJourney) {
-				delete questionsCache[selectedJourney.id];
-				questionsCache = { ...questionsCache };
-				await loadQuestions(selectedJourney.id);
-			}
+			await invalidateAll();
 		} catch {
 			toast.error('Failed to save question');
 		} finally {
@@ -202,9 +161,8 @@
 	async function toggleQuestionStatus(journey: Journey, question: JourneyQuestion) {
 		try {
 			await apiFetch(endpoints.journeys.question(journey.id.toString(), question.id.toString()), { method: 'PUT', body: JSON.stringify({ ...question, is_active: !question.is_active }) });
-			question.is_active = !question.is_active;
-			questionsCache[journey.id] = [...getQuestions(journey.id)];
-			questionsCache = { ...questionsCache };
+			await invalidateAll();
+			toast.success('Question status toggled');
 		} catch {
 			toast.error('Failed to toggle question');
 		}
@@ -226,15 +184,13 @@
 		try {
 			if (editingQuestion) {
 				await apiFetch(endpoints.journeys.question(selectedJourney.id.toString(), editingQuestion.id.toString()), { method: 'DELETE' });
-				questionsCache[selectedJourney.id] = getQuestions(selectedJourney.id).filter(q => q.id !== editingQuestion!.id);
-				questionsCache = { ...questionsCache };
 				toast.success('Question deleted');
 			} else {
 				await apiFetch(endpoints.journeys.delete(selectedJourney.id.toString()), { method: 'DELETE' });
-				journeys = journeys.filter((j) => j.id !== selectedJourney!.id);
 				toast.success('Journey deleted');
 			}
 			showDeleteModal = false;
+			await invalidateAll();
 		} catch {
 			toast.error(editingQuestion ? 'Failed to delete question' : 'Failed to delete journey');
 		}
@@ -248,10 +204,6 @@
 		if (questionForm.options.length <= 1) return;
 		questionForm.options = questionForm.options.filter((_, i) => i !== idx);
 	}
-
-	onMount(() => {
-		loadJourneys();
-	});
 </script>
 
 <svelte:head>
@@ -295,10 +247,7 @@
 	</div>
 
 	<!-- Journeys List -->
-	{#if loading}
-		<div class="flex items-center justify-center py-12"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div></div>
-	{:else}
-		<div class="space-y-3">
+	<div class="space-y-3">
 			{#each journeys as journey (journey.id)}
 				<div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden {expandedJourneys.has(journey.id) ? 'ring-1 ring-blue-200' : ''}">
 					<!-- Journey Header -->
@@ -350,9 +299,7 @@
 					<!-- Questions -->
 					{#if expandedJourneys.has(journey.id)}
 						<div class="border-t border-gray-100 bg-gray-50 p-4">
-							{#if loadingQuestions[journey.id]}
-								<div class="flex items-center gap-2 text-sm text-gray-500"><div class="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div> Loading questions...</div>
-							{:else if getQuestions(journey.id).length === 0}
+							{#if getQuestions(journey.id).length === 0}
 								<div class="text-center py-4 text-sm text-gray-400">
 									<p>No questions yet</p>
 									<div class="flex items-center justify-center gap-3 mt-2">
@@ -432,7 +379,7 @@
 				</div>
 			{/if}
 		</div>
-	{/if}
+	</div>
 </div>
 
 <!-- Journey Create/Edit Modal — uses form action -->
