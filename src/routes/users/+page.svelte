@@ -1,98 +1,32 @@
 <script lang="ts">
-	import { get } from 'svelte/store';
-	import { PlusIcon } from 'lucide-svelte';
-	import { AppTable, AppPagination, AppFilters } from '$components/core';
-	import { useTable } from '$lib/composables/useTable';
-	import type { FetchParams } from '$lib/composables/useTable';
-	import { endpoints } from '$config/endpoints';
-	import { apiFetch } from '$utils/api';
-	import UserModal from '$components/users/UserModal.svelte';
-	import type { Column } from '$components/core/AppTable.svelte';
+	import { UsersIcon, SearchIcon, XIcon } from 'lucide-svelte';
+	import type { PageData } from './$types';
 
-	interface User {
-		id: number;
-		name: string;
-		email: string;
-		status: string;
-		role?: string;
-		phone?: string;
-		created_at: string;
-		[key: string]: unknown;
-	}
+	let { data }: { data: PageData } = $props();
 
-	const table = useTable({ initialSortKey: 'name', initialSortDirection: 'asc' });
+	let search = $state('');
 
-	let users = $state<User[]>([]);
-	let modalOpen = $state(false);
-	let editingUser = $state<User | null>(null);
-	let error = $state('');
-
-	const columns: Column[] = [
-		{ key: 'name', label: 'Name', sortable: true },
-		{ key: 'email', label: 'Email', sortable: true },
-		{ key: 'role', label: 'Role' },
-		{ key: 'status', label: 'Status', sortable: true },
-		{ key: 'created_at', label: 'Created', sortable: true }
-	];
-
-	async function fetchUsers(params: FetchParams) {
-		error = '';
-		table.setLoading(true);
-		try {
-			const qs = new URLSearchParams();
-			qs.set('page', String(params.page));
-			qs.set('per_page', String(params.per_page));
-			if (params.sort_by) qs.set('sort_by', params.sort_by);
-			if (params.sort_direction) qs.set('sort_direction', params.sort_direction);
-			if (params.search) qs.set('search', params.search);
-
-			const response = await apiFetch<{ data: User[]; meta?: { total?: number } }>(
-				`${endpoints.users.list}?${qs.toString()}`
-			);
-
-			const data = response.data ?? response;
-			users = Array.isArray(data) ? data : [];
-			table.setTotalItems(response.meta?.total ?? users.length);
-		} catch (err: unknown) {
-			error = err instanceof Error ? err.message : 'Failed to load users';
-		} finally {
-			table.setLoading(false);
-		}
-	}
-
-	$effect(() => {
-		fetchUsers(get(table.fetchParams));
+	let filtered = $derived.by(() => {
+		const q = search.toLowerCase().trim();
+		if (!q) return data.users;
+		return data.users.filter(
+			(u) =>
+				(u.name?.toLowerCase().includes(q) ?? false) ||
+				(u.email?.toLowerCase().includes(q) ?? false)
+		);
 	});
 
-	function handleSort(key: string) {
-		table.toggleSort(key);
+	function roleLabel(status: string | null): string {
+		if (status === 'registered') return 'Registered';
+		if (status === 'guest') return 'Guest';
+		return status ?? 'Guest';
 	}
 
-	function handleEdit(user: Record<string, unknown>) {
-		editingUser = user as User;
-		modalOpen = true;
-	}
-
-	function handleCreate() {
-		editingUser = null;
-		modalOpen = true;
-	}
-
-	function handleModalClose() {
-		modalOpen = false;
-		editingUser = null;
-	}
-
-	function handleModalSave() {
-		handleModalClose();
-		fetchUsers(get(table.fetchParams));
-	}
-
-	function formatDate(dateStr: string): string {
-		if (!dateStr) return '';
-		return new Date(dateStr).toLocaleDateString('en-US', {
-			month: 'short',
-			day: 'numeric',
+	function formatDate(d: string): string {
+		if (!d) return '—';
+		return new Date(d).toLocaleDateString('pt-BR', {
+			day: '2-digit',
+			month: '2-digit',
 			year: 'numeric'
 		});
 	}
@@ -107,77 +41,101 @@
 	<div class="flex items-center justify-between mb-6">
 		<div>
 			<h1 class="text-2xl font-bold text-gray-900">Users</h1>
-			<p class="text-sm text-gray-500 mt-1">Manage user accounts</p>
+			<p class="text-sm text-gray-500 mt-1">
+				Manage user accounts
+				<span class="ml-2 text-gray-400">{data.total} total</span>
+			</p>
 		</div>
-		<button
-			onclick={handleCreate}
-			class="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
-		>
-			<PlusIcon class="h-4 w-4" />
-			Add User
-		</button>
 	</div>
 
-	<!-- Error -->
-	{#if error}
-		<div class="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
-			{error}
+	<!-- Search -->
+	<div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-4">
+		<div class="relative max-w-md">
+			<SearchIcon class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+			<input
+				type="text"
+				bind:value={search}
+				placeholder="Search by name or email..."
+				class="w-full pl-9 pr-8 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+			/>
+			{#if search}
+				<button
+					onclick={() => (search = '')}
+					class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+				>
+					<XIcon class="h-4 w-4" />
+				</button>
+			{/if}
 		</div>
-	{/if}
-
-	<!-- Filters -->
-	<AppFilters
-		bind:search={$table.search}
-		bind:perPage={$table.perPage}
-		searchPlaceholder="Search users..."
-		onSearchChange={(q) => table.setSearch(q)}
-		onPerPageChange={(pp) => table.setPerPage(pp)}
-		loading={$table.loading}
-	/>
+	</div>
 
 	<!-- Table -->
-	<AppTable
-		columns={columns}
-		rows={users}
-		loading={$table.loading}
-		sortKey={$table.sortKey}
-		sortDirection={$table.sortDirection}
-		onSort={handleSort}
-		onRowClick={handleEdit}
-	>
-		{#snippet cellRenderer(row, col)}
-			{#if col.key === 'name'}
-				<span class="font-medium text-gray-900">{row.name as string}</span>
-			{:else if col.key === 'email'}
-				<span class="text-gray-500">{row.email as string}</span>
-			{:else if col.key === 'role'}
-				<span class="text-gray-600">{(row.role as string) || '—'}</span>
-			{:else if col.key === 'status'}
-				<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
-					{row.status === 'active' ? 'bg-green-100 text-green-700' : row.status === 'inactive' ? 'bg-gray-100 text-gray-600' : 'bg-yellow-100 text-yellow-700'}">
-					{row.status as string}
-				</span>
-			{:else if col.key === 'created_at'}
-				<span class="text-gray-500">{formatDate(row.created_at as string)}</span>
-			{:else}
-				{row[col.key] as unknown as string ?? ''}
-			{/if}
-		{/snippet}
+	<div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+		<div class="overflow-x-auto">
+			<table class="min-w-full divide-y divide-gray-200">
+				<thead class="bg-gray-50">
+					<tr>
+						<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+						<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
+						<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Role</th>
+						<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+						<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Created</th>
+					</tr>
+				</thead>
+				<tbody class="bg-white divide-y divide-gray-200">
+					{#if filtered.length === 0}
+						<tr>
+							<td colspan="5" class="px-4 py-12 text-center">
+								<div class="flex flex-col items-center text-gray-500">
+									<UsersIcon class="h-12 w-12 mb-3 text-gray-300" />
+									<h3 class="text-lg font-medium text-gray-700 mb-1">No users found</h3>
+									<p class="text-sm">
+										{search ? 'Try adjusting your search.' : 'No users have been created yet.'}
+									</p>
+								</div>
+							</td>
+						</tr>
+					{:else}
+						{#each filtered as user (user.id)}
+							<tr class="hover:bg-gray-50 transition-colors">
+								<td class="px-4 py-3">
+									<span class="text-sm font-medium text-gray-900">
+										{user.name || 'Unknown User'}
+									</span>
+								</td>
+								<td class="px-4 py-3 text-sm text-gray-500">
+									{user.email || '—'}
+								</td>
+								<td class="px-4 py-3">
+									<span
+										class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
+										{user.status === 'registered' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}"
+									>
+										{roleLabel(user.status)}
+									</span>
+								</td>
+								<td class="px-4 py-3">
+									<span
+										class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
+										{user.chatbot_paused ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700'}"
+									>
+										{user.chatbot_paused ? 'Paused' : 'Active'}
+									</span>
+								</td>
+								<td class="px-4 py-3 text-sm text-gray-500">
+									{formatDate(user.created_at)}
+								</td>
+							</tr>
+						{/each}
+					{/if}
+				</tbody>
+			</table>
+		</div>
 
-		<AppPagination
-			current={$table.page}
-			total={$table.totalPages}
-			totalItems={$table.totalItems}
-			perPage={$table.perPage}
-			onPageChange={(p) => table.setPage(p)}
-		/>
-	</AppTable>
-
-	<UserModal
-		bind:open={modalOpen}
-		mode={editingUser ? 'edit' : 'create'}
-		user={editingUser}
-		onSave={handleModalSave}
-		onClose={handleModalClose}
-	/>
+		{#if search}
+			<div class="px-4 py-3 border-t border-gray-200 bg-gray-50 text-sm text-gray-500">
+				Showing {filtered.length} of {data.users.length} users
+			</div>
+		{/if}
+	</div>
 </div>
