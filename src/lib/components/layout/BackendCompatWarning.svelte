@@ -1,13 +1,13 @@
 <script lang="ts">
+	import { get } from 'svelte/store';
 	import { ChevronDown, ChevronUp, X } from 'lucide-svelte';
 	import { backendCompat } from '$utils/backend-compat';
 
 	let expanded = $state(false);
 
 	let missingEndpoints = $derived.by(() => {
-	// Re-subscribe reactively via get()
-	get(backendCompat);
-});
+		return get(backendCompat);
+	});
 
 	function clearAll() {
 		backendCompat.clear();
