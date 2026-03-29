@@ -43,7 +43,7 @@
 	});
 
 	// Detail/log modal state
-	let detailWebhook = $state<Channel | null>(null);
+	let detailWebhook = $state<Webhook | null>(null);
 	let showDetailModal = $state(false);
 	let showLogModal = $state(false);
 
@@ -56,7 +56,7 @@
 		'system.error'
 	];
 
-	interface Channel {
+	interface Webhook {
 		id: number;
 		name: string;
 		provider: string;
@@ -68,13 +68,8 @@
 		updated_at: string;
 	}
 
-	// Derive webhooks from channels (channels with webhook_url configured)
-	let webhooks = $derived(
-		(data.channels as Channel[]).filter((ch) => ch.webhook_url)
-	);
-
 	let filteredWebhooks = $derived(() => {
-		let filtered = webhooks;
+		let filtered = data.webhooks as Webhook[];
 		if (searchTerm) {
 			const term = searchTerm.toLowerCase();
 			filtered = filtered.filter(
@@ -129,7 +124,7 @@
 		}
 	}
 
-	async function testWebhook(webhook: Channel) {
+	async function testWebhook(webhook: Webhook) {
 		try {
 			await apiFetch(endpoints.webhooks.simulate, {
 				method: 'POST',
@@ -142,7 +137,7 @@
 		activeDropdown = null;
 	}
 
-	async function deleteWebhook(webhook: Channel) {
+	async function deleteWebhook(webhook: Webhook) {
 		if (!confirm(`Delete webhook configuration for "${webhook.name}"?`)) return;
 		try {
 			await apiFetch(`${endpoints.channels.get(String(webhook.id))}`, {
@@ -221,7 +216,7 @@
 					</div>
 					<div>
 						<p class="text-xs text-gray-500">Configured Webhooks</p>
-						<p class="text-lg font-semibold text-gray-900">{webhooks.length}</p>
+						<p class="text-lg font-semibold text-gray-900">{data.webhooks.length}</p>
 					</div>
 				</div>
 				<div class="bg-white rounded-lg border border-gray-200 p-3 flex items-center gap-3">
