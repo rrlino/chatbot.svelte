@@ -1,13 +1,13 @@
 <script lang="ts">
-	import { get } from 'svelte/store';
+	import { page } from '$app/state';
+	import { goto } from '$app/navigation';
+	import { enhance } from '$app/forms';
+	import { invalidateAll } from '$app/navigation';
 	import { RefreshCwIcon, MessageSquareIcon, ArrowUpIcon, ArrowDownIcon, AlertCircleIcon } from 'lucide-svelte';
 	import { AppTable, AppPagination, AppFilters } from '$components/core';
-	import { useTable } from '$lib/composables/useTable';
-	import type { FetchParams } from '$lib/composables/useTable';
-	import { endpoints } from '$config/endpoints';
-	import { apiFetch } from '$utils/api';
 	import { toast } from '$lib/stores/toast';
 	import type { Column } from '$components/core/AppTable.svelte';
+	import type { PageData } from './$types';
 
 	interface Message {
 		id: number;
@@ -34,17 +34,38 @@
 		pending: number;
 	}
 
-	const table = useTable({ initialSortKey: 'created_at', initialSortDirection: 'desc' });
+	let { data }: { data: PageData } = $props();
 
-	let messages = $state<Message[]>([]);
-	let error = $state('');
-	let stats = $state<MessageStats | null>(null);
 	let selectedMessage = $state<Message | null>(null);
+	let loading = $state(false);
 
-	// Filters
-	let filterStatus = $state('');
-	let filterDirection = $state('');
-	let filterPhone = $state('');
+	// Filter state synced from URL via server data
+	let searchValue = $state(data.filters.search);
+	let perPageValue = $state(data.filters.perPage);
+	let filterStatus = $state(data.filters.status);
+	let filterDirection = $state(data.filters.direction);
+
+	// Sync local state when server data updates (after navigation)
+	$effect(() => {
+		searchValue = data.filters.search;
+		perPageValue = data.filters.perPage;
+		filterStatus = data.filters.status;
+		filterDirection = data.filters.direction;
+	});
+
+	// Handle form action results
+	$effect(() => {
+		const formResult = page.form;
+		if (formResult?.success && formResult.action === 'retry') {
+			toast.success('Message retry queued');
+			invalidateAll();
+		}
+		if (formResult?.error) {
+			toast.error(formResult.error as string);
+		}
+	});
+
+	const totalPages = $derived(Math.max(1, Math.ceil(data.total / data.filters.perPage)));
 
 	const columns: Column[] = [
 		{ key: 'id', label: 'ID', sortable: true },
@@ -55,53 +76,49 @@
 		{ key: 'error_message', label: 'Error' }
 	];
 
-	async function fetchStats() {
-		try {
-			const response = await apiFetch<{ data: MessageStats }>(endpoints.messages.stats);
-			stats = response.data ?? response;
-		} catch {
-			stats = null;
+	function buildUrl(overrides: Record<string, string | number> = {}): string {
+		const params: Record<string, string | number> = {
+			page: data.filters.page,
+			per_page: data.filters.perPage,
+			sort_by: data.filters.sortBy,
+			sort_direction: data.filters.sortDirection
+		};
+		if (data.filters.status) params.status = data.filters.status;
+		if (data.filters.direction) params.direction = data.filters.direction;
+		if (data.filters.search) params.search = data.filters.search;
+
+		Object.assign(params, overrides);
+
+		const qs = new URLSearchParams();
+		for (const [key, value] of Object.entries(params)) {
+			if (value !== '' && value !== 0) qs.set(key, String(value));
 		}
+		return `/messages?${qs.toString()}`;
 	}
 
-	async function fetchMessages(params: FetchParams) {
-		error = '';
-		table.setLoading(true);
-		try {
-			const qs = new URLSearchParams();
-			qs.set('limit', String(params.per_page));
-			qs.set('offset', String((params.page - 1) * params.per_page));
-			if (params.sort_by) qs.set('sort_by', params.sort_by);
-			if (params.sort_direction) qs.set('sort_direction', params.sort_direction);
-			if (filterStatus) qs.set('status', filterStatus);
-			if (filterDirection) qs.set('direction', filterDirection);
-			if (filterPhone) qs.set('phone', filterPhone);
-			if (params.search) qs.set('search', params.search);
-
-			const response = await apiFetch<{ data: Message[]; total?: number }>(
-				`${endpoints.messages.list}?${qs.toString()}`
-			);
-
-			const data = response.data ?? response;
-			messages = Array.isArray(data) ? data : [];
-			table.setTotalItems(response.total ?? messages.length);
-		} catch (err: unknown) {
-			error = err instanceof Error ? err.message : 'Failed to load messages';
-		} finally {
-			table.setLoading(false);
-		}
+	async function navigateTo(overrides: Record<string, string | number> = {}) {
+		loading = true;
+		await goto(buildUrl(overrides));
+		loading = false;
 	}
-
-	$effect(() => {
-		fetchStats();
-	});
-
-	$effect(() => {
-		fetchMessages(get(table.fetchParams));
-	});
 
 	function handleSort(key: string) {
-		table.toggleSort(key);
+		const currentKey = data.filters.sortBy;
+		const currentDir = data.filters.sortDirection;
+		const newDir = currentKey === key && currentDir === 'desc' ? 'asc' : 'desc';
+		navigateTo({ sort_by: key, sort_direction: newDir, page: 1 });
+	}
+
+	function handlePageChange(p: number) {
+		navigateTo({ page: p });
+	}
+
+	function handleSearchChange(q: string) {
+		navigateTo({ search: q, page: 1 });
+	}
+
+	function handlePerPageChange(pp: number) {
+		navigateTo({ per_page: pp, page: 1 });
 	}
 
 	function handleRowClick(row: Record<string, unknown>) {
@@ -112,15 +129,10 @@
 		selectedMessage = null;
 	}
 
-	async function retryMessage(msg: Message) {
-		try {
-			await apiFetch(endpoints.messages.retry(String(msg.id)), { method: 'POST' });
-			toast.success(`Message #${msg.id} retry queued`);
-			fetchMessages(get(table.fetchParams));
-			fetchStats();
-		} catch (err: unknown) {
-			toast.error(err instanceof Error ? err.message : 'Retry failed');
-		}
+	async function refreshData() {
+		loading = true;
+		await invalidateAll();
+		loading = false;
 	}
 
 	function formatDate(dateStr: string): string {
@@ -159,8 +171,9 @@
 			<p class="text-sm text-gray-500 mt-1">Monitor and manage all messages</p>
 		</div>
 		<button
-			onclick={() => { fetchStats(); fetchMessages(get(table.fetchParams)); }}
-			class="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200 transition-colors"
+			onclick={refreshData}
+			disabled={loading}
+			class="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
 		>
 			<RefreshCwIcon class="h-4 w-4" />
 			Refresh
@@ -168,15 +181,15 @@
 	</div>
 
 	<!-- Stats Bar -->
-	{#if stats}
+	{#if data.stats}
 		<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
 			{#each [
-				{ label: 'Total', value: stats.total, color: 'bg-gray-50' },
-				{ label: 'Sent', value: stats.sent, color: 'bg-blue-50' },
-				{ label: 'Delivered', value: stats.delivered, color: 'bg-green-50' },
-				{ label: 'Read', value: stats.read, color: 'bg-purple-50' },
-				{ label: 'Failed', value: stats.failed, color: 'bg-red-50' },
-				{ label: 'Pending', value: stats.pending, color: 'bg-yellow-50' }
+				{ label: 'Total', value: data.stats.total, color: 'bg-gray-50' },
+				{ label: 'Sent', value: data.stats.sent, color: 'bg-blue-50' },
+				{ label: 'Delivered', value: data.stats.delivered, color: 'bg-green-50' },
+				{ label: 'Read', value: data.stats.read, color: 'bg-purple-50' },
+				{ label: 'Failed', value: data.stats.failed, color: 'bg-red-50' },
+				{ label: 'Pending', value: data.stats.pending, color: 'bg-yellow-50' }
 			] as stat}
 				<div class="{stat.color} rounded-lg p-3">
 					<p class="text-xs font-medium text-gray-500 uppercase">{stat.label}</p>
@@ -187,24 +200,24 @@
 	{/if}
 
 	<!-- Error -->
-	{#if error}
-		<div class="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{error}</div>
+	{#if data.error}
+		<div class="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{data.error}</div>
 	{/if}
 
 	<!-- Filters -->
 	<AppFilters
-		bind:search={$table.search}
-		bind:perPage={$table.perPage}
+		bind:search={searchValue}
+		bind:perPage={perPageValue}
 		searchPlaceholder="Search messages..."
-		onSearchChange={(q) => table.setSearch(q)}
-		onPerPageChange={(pp) => table.setPerPage(pp)}
-		loading={$table.loading}
+		onSearchChange={(q) => handleSearchChange(q)}
+		onPerPageChange={(pp) => handlePerPageChange(pp)}
+		{loading}
 	>
 		<!-- Status filter -->
 		<select
 			bind:value={filterStatus}
-			onchange={() => table.setPage(1)}
-			disabled={$table.loading}
+			onchange={() => navigateTo({ status: filterStatus, page: 1 })}
+			disabled={loading}
 			class="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
 		>
 			<option value="">All Statuses</option>
@@ -216,8 +229,8 @@
 		<!-- Direction filter -->
 		<select
 			bind:value={filterDirection}
-			onchange={() => table.setPage(1)}
-			disabled={$table.loading}
+			onchange={() => navigateTo({ direction: filterDirection, page: 1 })}
+			disabled={loading}
 			class="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
 		>
 			<option value="">All Directions</option>
@@ -228,11 +241,11 @@
 
 	<!-- Table -->
 	<AppTable
-		columns={columns}
-		rows={messages}
-		loading={$table.loading}
-		sortKey={$table.sortKey}
-		sortDirection={$table.sortDirection}
+		{columns}
+		rows={data.messages}
+		{loading}
+		sortKey={data.filters.sortBy}
+		sortDirection={data.filters.sortDirection as 'asc' | 'desc'}
 		onSort={handleSort}
 		onRowClick={handleRowClick}
 	>
@@ -258,7 +271,7 @@
 				{#if row.error_message}
 					<span class="text-red-600 text-xs truncate max-w-[200px] block" title={row.error_message as string}>{row.error_message as string}</span>
 				{:else}
-					<span class="text-gray-300">—</span>
+					<span class="text-gray-300">&mdash;</span>
 				{/if}
 			{:else}
 				{row[col.key] as unknown as string ?? ''}
@@ -266,11 +279,11 @@
 		{/snippet}
 
 		<AppPagination
-			current={$table.page}
-			total={$table.totalPages}
-			totalItems={$table.totalItems}
-			perPage={$table.perPage}
-			onPageChange={(p) => table.setPage(p)}
+			current={data.filters.page}
+			total={totalPages}
+			totalItems={data.total}
+			perPage={data.filters.perPage}
+			onPageChange={handlePageChange}
 		/>
 	</AppTable>
 
@@ -339,13 +352,25 @@
 					{/if}
 
 					{#if selectedMessage.status === 'failed' || selectedMessage.status === 'error'}
-						<button
-							onclick={() => retryMessage(selectedMessage)}
-							class="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+						<form
+							method="POST"
+							action="?/retry"
+							use:enhance={() => {
+								return ({ update }) => {
+									update({ reset: false });
+									closeDetail();
+								};
+							}}
 						>
-							<MessageSquareIcon class="h-4 w-4" />
-							Retry Message
-						</button>
+							<input type="hidden" name="id" value={selectedMessage.id} />
+							<button
+								type="submit"
+								class="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+							>
+								<MessageSquareIcon class="h-4 w-4" />
+								Retry Message
+							</button>
+						</form>
 					{/if}
 				</div>
 			</div>
