@@ -1,15 +1,32 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
-	import { Activity, Users, Bot, TrendingUp, MessageSquare, Clock, RefreshCw } from 'lucide-svelte';
+	import { onMount } from 'svelte';
+	import { goto, invalidateAll } from '$app/navigation';
+	import {
+		Activity,
+		Users,
+		Bot,
+		TrendingUp,
+		MessageSquare,
+		Clock,
+		RefreshCw,
+		ArrowRight
+	} from 'lucide-svelte';
 	import LoadingState from '$components/core/LoadingState.svelte';
 	import EmptyState from '$components/core/EmptyState.svelte';
 
 	let { data } = $props();
 	let loading = $state(false);
-	let recentActivity = $state(data.recentActivity);
 	let period = $state('day');
+	let chartsReady = $state(false);
 
-	function getActivityIcon(type: string) {
+	let messageChartCanvas: HTMLCanvasElement;
+	let directionChartCanvas: HTMLCanvasElement;
+	let messageChart: any = null;
+	let directionChart: any = null;
+
+	// ---- helpers ----
+
+	function getActivityColor(type: string) {
 		switch (type) {
 			case 'message_in': return 'text-green-500';
 			case 'message_out': return 'text-blue-500';
@@ -60,35 +77,118 @@
 		return `${Math.floor(diffMins / 1440)}d ago`;
 	}
 
-	async function refreshActivity() {
+	// ---- chart period fallback data ----
+
+	const fallbackPeriodData: Record<string, { labels: string[]; data: number[] }> = {
+		week: {
+			labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+			data: [0, 0, 0, 0, 0, 0, 0]
+		},
+		month: {
+			labels: ['Week 1', 'Week 2', 'Week 3', 'Week 4'],
+			data: [0, 0, 0, 0]
+		}
+	};
+
+	// ---- chart init ----
+
+	function buildChartConfig(labels: string[], values: number[]) {
+		return {
+			type: 'line' as const,
+			data: {
+				labels,
+				datasets: [{
+					label: 'Messages',
+					data: values,
+					borderColor: '#3b82f6',
+					backgroundColor: 'rgba(59, 130, 246, 0.08)',
+					fill: true,
+					tension: 0.4,
+					pointRadius: 3,
+					pointBackgroundColor: '#3b82f6'
+				}]
+			},
+			options: {
+				responsive: true,
+				maintainAspectRatio: false,
+				interaction: { intersect: false, mode: 'index' as const },
+				scales: {
+					x: { grid: { display: false }, ticks: { maxTicksLimit: 8 } },
+					y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.05)' } }
+				},
+				plugins: { legend: { display: false } }
+			}
+		};
+	}
+
+	function initCharts(Chart: any) {
+		// Message Activity line chart
+		if (messageChartCanvas) {
+			messageChart?.destroy();
+			messageChart = new Chart(messageChartCanvas, buildChartConfig(
+				data.chartData.hourly.labels,
+				data.chartData.hourly.data
+			));
+		}
+
+		// Direction doughnut chart
+		if (directionChartCanvas) {
+			directionChart?.destroy();
+			directionChart = new Chart(directionChartCanvas, {
+				type: 'doughnut',
+				data: {
+					labels: data.chartData.direction.labels,
+					datasets: [{
+						data: data.chartData.direction.counts,
+						backgroundColor: ['#22c55e', '#3b82f6'],
+						borderWidth: 0,
+						hoverOffset: 4
+					}]
+				},
+				options: {
+					responsive: true,
+					maintainAspectRatio: false,
+					cutout: '65%',
+					plugins: {
+						legend: { position: 'bottom' as const, labels: { padding: 16, usePointStyle: true, pointStyle: 'circle' } }
+					}
+				}
+			});
+		}
+	}
+
+	function updatePeriod(newPeriod: string) {
+		period = newPeriod;
+		if (!messageChart) return;
+
+		if (newPeriod === 'day') {
+			messageChart.data.labels = data.chartData.hourly.labels;
+			messageChart.data.datasets[0].data = data.chartData.hourly.data;
+		} else {
+			const fallback = fallbackPeriodData[newPeriod];
+			if (fallback) {
+				messageChart.data.labels = fallback.labels;
+				messageChart.data.datasets[0].data = fallback.data;
+			}
+		}
+		messageChart.update();
+	}
+
+	onMount(async () => {
+		try {
+			const { Chart, registerables } = await import('chart.js');
+			Chart.register(...registerables);
+			initCharts(Chart);
+			chartsReady = true;
+		} catch (e) {
+			console.warn('Chart.js failed to load', e);
+		}
+	});
+
+	async function refreshData() {
 		loading = true;
 		try {
-			const token = localStorage.getItem('authToken');
-			const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api/v1';
-			const res = await fetch(`${API_BASE}/messages?limit=10`, {
-				headers: { Authorization: `Bearer ${token}` }
-			});
-			const json = await res.json() as any;
-			const messages: any[] = json.data ?? json;
-			recentActivity = messages
-				.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-				.slice(0, 10)
-				.map((msg: any) => {
-					const direction = (msg.direction ?? '').toLowerCase();
-					const status = (msg.status ?? '').toLowerCase();
-					let type = 'message';
-					if (status === 'failed' || status === 'error') type = 'message_failed';
-					else if (direction === 'inbound') type = 'message_in';
-					else if (direction === 'outbound') type = 'message_out';
-					return {
-						id: msg.id,
-						type,
-						title: (msg.content ?? '').substring(0, 80) || 'New Message',
-						counterpartyName: msg.from_number ?? 'Unknown',
-						counterpartyPhone: msg.from_number ?? '',
-						timestamp: msg.created_at
-					};
-				});
+			await invalidateAll();
 		} finally {
 			loading = false;
 		}
@@ -118,7 +218,7 @@
 				</div>
 				<div>
 					<p class="text-sm text-gray-500" data-testid="total-messages-label">Total Messages</p>
-					<p class="text-2xl font-bold">{data.stats.totalMessages}</p>
+					<p class="text-2xl font-bold">{data.stats.totalMessages.toLocaleString()}</p>
 				</div>
 			</div>
 		</div>
@@ -130,7 +230,7 @@
 				</div>
 				<div>
 					<p class="text-sm text-gray-500" data-testid="active-users-label">Total Users</p>
-					<p class="text-2xl font-bold">{data.stats.activeUsers}</p>
+					<p class="text-2xl font-bold">{data.stats.activeUsers.toLocaleString()}</p>
 				</div>
 			</div>
 		</div>
@@ -160,6 +260,63 @@
 		</div>
 	</div>
 
+	<!-- Charts Row -->
+	<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+		<!-- Message Activity Line Chart -->
+		<div class="lg:col-span-2 bg-white rounded-xl shadow-sm">
+			<div class="flex items-center justify-between p-5 border-b border-gray-100">
+				<h2 class="text-lg font-semibold flex items-center gap-2">
+					<TrendingUp class="h-5 w-5 text-gray-400" />
+					Message Activity
+				</h2>
+				<div class="flex rounded-lg border border-gray-200 overflow-hidden">
+					{#each [['day', '24h'], ['week', '7d'], ['month', '30d']] as [value, label]}
+						<button
+							onclick={() => updatePeriod(value)}
+							class="px-3 py-1 text-xs font-medium transition-colors {period === value
+								? 'bg-blue-600 text-white'
+								: 'bg-white text-gray-600 hover:bg-gray-50'}"
+						>
+							{label}
+						</button>
+					{/each}
+				</div>
+			</div>
+			<div class="p-5">
+				{#if chartsReady}
+					<div class="relative" style="height: 280px;">
+						<canvas bind:this={messageChartCanvas}></canvas>
+					</div>
+				{:else}
+					<div class="flex items-center justify-center text-gray-400" style="height: 280px;">
+						<LoadingState />
+					</div>
+				{/if}
+			</div>
+		</div>
+
+		<!-- Message Direction Doughnut Chart -->
+		<div class="bg-white rounded-xl shadow-sm">
+			<div class="p-5 border-b border-gray-100">
+				<h2 class="text-lg font-semibold flex items-center gap-2">
+					<MessageSquare class="h-5 w-5 text-gray-400" />
+					Message Distribution
+				</h2>
+			</div>
+			<div class="p-5">
+				{#if chartsReady}
+					<div class="relative" style="height: 280px;">
+						<canvas bind:this={directionChartCanvas}></canvas>
+					</div>
+				{:else}
+					<div class="flex items-center justify-center text-gray-400" style="height: 280px;">
+						<LoadingState />
+					</div>
+				{/if}
+			</div>
+		</div>
+	</div>
+
 	<!-- Main Content Grid -->
 	<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
 		<!-- Recent Activity -->
@@ -170,7 +327,7 @@
 					Recent Activity
 				</h2>
 				<button
-					onclick={refreshActivity}
+					onclick={refreshData}
 					disabled={loading}
 					class="text-sm text-blue-600 hover:text-blue-800 flex items-center gap-1 disabled:opacity-50"
 				>
@@ -181,16 +338,16 @@
 			<div class="p-0">
 				{#if loading}
 					<LoadingState />
-				{:else if recentActivity.length === 0}
+				{:else if data.recentActivity.length === 0}
 					<EmptyState title="No recent activity" description="Messages will appear here once users start chatting." />
 				{:else}
 					<div class="divide-y divide-gray-50">
-						{#each recentActivity as item}
+						{#each data.recentActivity as item}
 							<div class="flex items-start gap-3 p-4 hover:bg-gray-50 transition-colors">
 								<div class="flex-shrink-0 p-2 bg-gray-100 rounded-full h-9 w-9 flex items-center justify-center">
-									<MessageSquare class="h-4 w-4 {getActivityIcon(item.type)}" />
+									<MessageSquare class="h-4 w-4 {getActivityColor(item.type)}" />
 								</div>
-								<div class="flex-grow-1 min-w-0">
+								<div class="flex-grow min-w-0">
 									<p class="text-sm text-gray-900 truncate" title={item.title}>{item.title}</p>
 									<p class="text-xs text-gray-500 mt-0.5">{item.counterpartyName}</p>
 								</div>
@@ -205,13 +362,14 @@
 					</div>
 				{/if}
 			</div>
-			{#if recentActivity.length > 0}
+			{#if data.recentActivity.length > 0}
 				<div class="p-4 border-t border-gray-100 text-center">
 					<button
 						onclick={() => goto('/messages')}
-						class="text-sm text-blue-600 hover:text-blue-800"
+						class="text-sm text-blue-600 hover:text-blue-800 inline-flex items-center gap-1"
 					>
-						View all messages →
+						View all messages
+						<ArrowRight class="h-4 w-4" />
 					</button>
 				</div>
 			{/if}
@@ -248,12 +406,40 @@
 							<p class="text-xs text-gray-500">Conversations</p>
 						</div>
 						<div class="text-center p-3 bg-gray-50 rounded-lg">
-							<p class="text-lg font-bold text-purple-600">{data.stats.totalChatbots}</p>
-							<p class="text-xs text-gray-500">Bots</p>
+							<p class="text-lg font-bold text-purple-600">{data.stats.chatbotsActive}</p>
+							<p class="text-xs text-gray-500">Active Bots</p>
 						</div>
 						<div class="text-center p-3 bg-gray-50 rounded-lg">
-							<p class="text-lg font-bold text-amber-600">{data.stats.totalMessages}</p>
-							<p class="text-xs text-gray-500">Total Msgs</p>
+							<p class="text-lg font-bold text-amber-600">{data.stats.messagesSent}</p>
+							<p class="text-xs text-gray-500">Sent</p>
+						</div>
+					</div>
+				</div>
+
+				<!-- Message Status Breakdown -->
+				<div>
+					<h3 class="text-sm text-gray-500 mb-2">Message Status</h3>
+					<div class="space-y-2">
+						<div class="flex items-center gap-2">
+							<span class="text-xs text-gray-500 w-14">Sent</span>
+							<div class="flex-grow bg-gray-200 rounded-full h-1.5">
+								<div class="bg-green-500 h-1.5 rounded-full" style="width: {data.stats.totalMessages ? (data.stats.messagesSent / data.stats.totalMessages * 100) : 0}%"></div>
+							</div>
+							<span class="text-xs text-gray-600 w-10 text-right">{data.stats.messagesSent}</span>
+						</div>
+						<div class="flex items-center gap-2">
+							<span class="text-xs text-gray-500 w-14">Pending</span>
+							<div class="flex-grow bg-gray-200 rounded-full h-1.5">
+								<div class="bg-yellow-500 h-1.5 rounded-full" style="width: {data.stats.totalMessages ? (data.stats.messagesPending / data.stats.totalMessages * 100) : 0}%"></div>
+							</div>
+							<span class="text-xs text-gray-600 w-10 text-right">{data.stats.messagesPending}</span>
+						</div>
+						<div class="flex items-center gap-2">
+							<span class="text-xs text-gray-500 w-14">Failed</span>
+							<div class="flex-grow bg-gray-200 rounded-full h-1.5">
+								<div class="bg-red-500 h-1.5 rounded-full" style="width: {data.stats.totalMessages ? (data.stats.messagesFailed / data.stats.totalMessages * 100) : 0}%"></div>
+							</div>
+							<span class="text-xs text-gray-600 w-10 text-right">{data.stats.messagesFailed}</span>
 						</div>
 					</div>
 				</div>
@@ -273,7 +459,7 @@
 									>
 										{getUserInitials(user.name)}
 									</div>
-									<div class="flex-grow-1 min-w-0">
+									<div class="flex-grow min-w-0">
 										<p class="text-sm font-medium text-gray-900 truncate">{user.name}</p>
 										<p class="text-xs text-gray-400">{formatTime(user.lastActive)}</p>
 									</div>
@@ -289,9 +475,10 @@
 			<div class="p-4 border-t border-gray-100 text-center">
 				<button
 					onclick={() => goto('/users')}
-					class="text-sm text-blue-600 hover:text-blue-800"
+					class="text-sm text-blue-600 hover:text-blue-800 inline-flex items-center gap-1"
 				>
-					View all users →
+					View all users
+					<ArrowRight class="h-4 w-4" />
 				</button>
 			</div>
 		</div>
