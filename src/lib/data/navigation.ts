@@ -47,7 +47,7 @@ export const integrationsMenu: DropdownMenu = {
 	icon: 'plug',
 	items: [
 		{ label: 'Channels', href: '/partner-management', icon: 'diagram-3' },
-		{ label: 'Webhooks', href: '/webhook-management', icon: 'link-45deg' },
+		{ label: 'Webhooks', href: '/webhooks', icon: 'link-45deg' },
 		{ label: 'API Tokens', href: '/api-tokens', icon: 'key' },
 		{ label: 'API Docs', href: '/api-docs', icon: 'file-earmark-code' },
 		{ label: 'API Management', href: '/api-management', icon: 'braces' }
