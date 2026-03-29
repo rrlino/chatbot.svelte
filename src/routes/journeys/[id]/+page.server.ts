@@ -1,11 +1,6 @@
 import { fail, redirect } from '@sveltejs/kit';
 import type { PageServerLoad, Actions } from './$types';
-
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api/v1';
-
-function authHeaders(token: string): Record<string, string> {
-	return { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
-}
+import { API_BASE, authHeaders, extractApiError } from '$lib/server/api';
 
 export const load: PageServerLoad = async ({ params, cookies }) => {
 	const token = cookies.get('authToken');
@@ -62,10 +57,7 @@ export const actions: Actions = {
 			});
 
 			if (!res.ok) {
-				const err = await res.json().catch(() => ({}));
-				return fail(res.status, {
-					error: (err as Record<string, string>).error || (err as Record<string, string>).message || 'Failed to create question'
-				});
+				return fail(res.status, { error: await extractApiError(res, 'Failed to create question') });
 			}
 
 			return { success: true, action: 'createQuestion' };
@@ -102,10 +94,7 @@ export const actions: Actions = {
 			});
 
 			if (!res.ok) {
-				const err = await res.json().catch(() => ({}));
-				return fail(res.status, {
-					error: (err as Record<string, string>).error || (err as Record<string, string>).message || 'Failed to update question'
-				});
+				return fail(res.status, { error: await extractApiError(res, 'Failed to update question') });
 			}
 
 			return { success: true, action: 'updateQuestion' };
@@ -129,10 +118,7 @@ export const actions: Actions = {
 			});
 
 			if (!res.ok) {
-				const err = await res.json().catch(() => ({}));
-				return fail(res.status, {
-					error: (err as Record<string, string>).error || (err as Record<string, string>).message || 'Failed to delete question'
-				});
+				return fail(res.status, { error: await extractApiError(res, 'Failed to delete question') });
 			}
 
 			return { success: true, action: 'deleteQuestion' };
@@ -172,10 +158,7 @@ export const actions: Actions = {
 			});
 
 			if (!res.ok) {
-				const err = await res.json().catch(() => ({}));
-				return fail(res.status, {
-					error: (err as Record<string, string>).error || (err as Record<string, string>).message || 'Failed to toggle question'
-				});
+				return fail(res.status, { error: await extractApiError(res, 'Failed to toggle question') });
 			}
 
 			return { success: true, action: 'toggleQuestion' };

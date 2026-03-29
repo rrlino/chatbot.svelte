@@ -1,11 +1,6 @@
 import { fail, redirect } from '@sveltejs/kit';
 import type { Actions } from './$types';
-
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api/v1';
-
-function authHeaders(token: string): Record<string, string> {
-	return { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
-}
+import { API_BASE, authHeaders, extractApiError } from '$lib/server/api';
 
 export const actions: Actions = {
 	create: async ({ request, cookies }) => {
@@ -33,10 +28,7 @@ export const actions: Actions = {
 			});
 
 			if (!res.ok) {
-				const err = await res.json().catch(() => ({}));
-				return fail(res.status, {
-					error: (err as Record<string, string>).error || (err as Record<string, string>).message || 'Failed to create journey'
-				});
+				return fail(res.status, { error: await extractApiError(res, 'Failed to create journey') });
 			}
 
 			return { success: true, action: 'create' };
@@ -70,10 +62,7 @@ export const actions: Actions = {
 			});
 
 			if (!res.ok) {
-				const err = await res.json().catch(() => ({}));
-				return fail(res.status, {
-					error: (err as Record<string, string>).error || (err as Record<string, string>).message || 'Failed to update journey'
-				});
+				return fail(res.status, { error: await extractApiError(res, 'Failed to update journey') });
 			}
 
 			return { success: true, action: 'update' };
@@ -97,10 +86,7 @@ export const actions: Actions = {
 			});
 
 			if (!res.ok) {
-				const err = await res.json().catch(() => ({}));
-				return fail(res.status, {
-					error: (err as Record<string, string>).error || (err as Record<string, string>).message || 'Failed to delete journey'
-				});
+				return fail(res.status, { error: await extractApiError(res, 'Failed to delete journey') });
 			}
 
 			return { success: true, action: 'delete' };
@@ -126,10 +112,7 @@ export const actions: Actions = {
 			});
 
 			if (!res.ok) {
-				const err = await res.json().catch(() => ({}));
-				return fail(res.status, {
-					error: (err as Record<string, string>).error || (err as Record<string, string>).message || 'Failed to toggle journey status'
-				});
+				return fail(res.status, { error: await extractApiError(res, 'Failed to toggle journey status') });
 			}
 
 			return { success: true, action: 'toggle' };
