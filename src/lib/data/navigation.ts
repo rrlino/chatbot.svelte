@@ -7,7 +7,7 @@ export interface NavItem {
 export const mainNav: NavItem[] = [
 	{ label: 'Messages', href: '/messages', icon: 'chat-dots' },
 	{ label: 'Users', href: '/users', icon: 'people' },
-	{ label: 'Conversation', href: '/conversation', icon: 'whatsapp' }
+	{ label: 'WhatsApp', href: '/whatsapp/conversations', icon: 'whatsapp' }
 ];
 
 export interface DropdownMenu {
