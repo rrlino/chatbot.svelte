@@ -1,7 +1,8 @@
 import { fail, redirect } from '@sveltejs/kit';
 import type { PageServerLoad, Actions } from './$types';
 
-const API_BASE = process.env.API_BASE_URL || import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api/v1';
+import { env } from '$env/dynamic/private';
+const API_BASE = env.API_BASE_URL || 'http://localhost:8080/api/v1';
 const API_ORIGIN = API_BASE.replace(/\/api\/v\d+$/, '');
 
 function resolveApiUrl(endpoint: string): string {
@@ -48,12 +49,25 @@ export const actions: Actions = {
 					path: '/',
 					httpOnly: false,
 					sameSite: 'lax',
+					secure: false,
 					maxAge: 60 * 60 * 24 * 7 // 7 days
 				});
 			}
 
-			return { success: true, token: data.token, user: data.user };
-		} catch {
+			// Store user info in a separate cookie for client-side access
+			if (data.user) {
+				cookies.set('user', JSON.stringify(data.user), {
+					path: '/',
+					httpOnly: false,
+					sameSite: 'lax',
+					secure: false,
+					maxAge: 60 * 60 * 24 * 7
+				});
+			}
+
+			throw redirect(303, '/dashboard');
+		} catch (e) {
+			if (e instanceof redirect) throw e;
 			return fail(500, { error: 'Unable to connect to server' });
 		}
 	}
