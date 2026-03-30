@@ -1,7 +1,6 @@
 import { redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
-
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://192.168.68.107:8080/api/v1';
+import { API_BASE, authHeaders } from '$lib/server/api';
 
 interface User {
 	id: number;
@@ -13,21 +12,29 @@ interface User {
 	created_at: string;
 }
 
-export const load: PageServerLoad = async ({ cookies }) => {
+export const load: PageServerLoad = async ({ cookies, url }) => {
 	const token = cookies.get('authToken');
 	if (!token) throw redirect(302, '/login');
 
-	const headers: Record<string, string> = {
-		'Content-Type': 'application/json',
-		Authorization: `Bearer ${token}`
-	};
+	const headers = authHeaders(token);
+
+	const page = Math.max(1, Number(url.searchParams.get('page')) || 1);
+	const perPage = Math.max(1, Number(url.searchParams.get('perPage')) || 25);
+	const search = url.searchParams.get('search') || '';
+	const statusFilter = url.searchParams.get('status') || '';
+
+	const params = new URLSearchParams({
+		limit: String(perPage),
+		offset: String((page - 1) * perPage)
+	});
+	if (search) params.set('search', search);
+	if (statusFilter) params.set('status', statusFilter);
 
 	let users: User[] = [];
 	let total = 0;
 
 	try {
-		const qs = new URLSearchParams({ limit: '100', offset: '0' });
-		const res = await fetch(`${API_BASE}/users?${qs}`, { headers });
+		const res = await fetch(`${API_BASE}/users?${params}`, { headers });
 		if (res.ok) {
 			const json = await res.json();
 			users = json.data ?? (Array.isArray(json) ? json : []);
@@ -37,5 +44,5 @@ export const load: PageServerLoad = async ({ cookies }) => {
 		console.error('Failed to fetch users:', err);
 	}
 
-	return { users, total };
+	return { users, total, page, perPage, search, statusFilter };
 };
