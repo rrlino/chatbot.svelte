@@ -7,6 +7,7 @@
 		Cpu
 	} from 'lucide-svelte';
 	import LanguageSwitcher from './LanguageSwitcher.svelte';
+	import ChannelSelector from '$lib/components/ChannelSelector.svelte';
 	import { mainNav, chatbotMenu, systemMenu, integrationsMenu, aiMenu } from '$data/navigation';
 
 	let currentLang = $state('pt');
@@ -186,6 +187,7 @@
 
 			<!-- Right side: Language + User -->
 			<div class="hidden lg:flex items-center gap-2">
+				<ChannelSelector />
 				<LanguageSwitcher bind:currentLang />
 
 				<!-- User Dropdown -->
@@ -251,6 +253,7 @@
 
 			<!-- Mobile Menu Button -->
 			<div class="flex items-center gap-2 lg:hidden">
+				<ChannelSelector />
 				<LanguageSwitcher bind:currentLang />
 				<button
 					onclick={toggleMobileMenu}

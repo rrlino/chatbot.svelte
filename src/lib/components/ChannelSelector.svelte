@@ -45,6 +45,11 @@
 			onchange={(e) => {
 				const value = (e.target as HTMLSelectElement).value;
 				selectedChannelId.set(value || null);
+				if (value) {
+					document.cookie = `channelId=${value}; path=/; max-age=${60*60*24*365}; SameSite=Lax`;
+				} else {
+					document.cookie = 'channelId=; path=/; max-age=0';
+				}
 			}}
 		>
 			<option value="">All channels</option>
