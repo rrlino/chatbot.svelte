@@ -1,4 +1,4 @@
-import { fail, redirect } from '@sveltejs/kit';
+import { fail, redirect, isRedirect } from '@sveltejs/kit';
 import type { PageServerLoad, Actions } from './$types';
 
 import { env } from '$env/dynamic/private';
@@ -67,7 +67,7 @@ export const actions: Actions = {
 
 			throw redirect(303, '/dashboard');
 		} catch (e) {
-			if (e instanceof redirect) throw e;
+			if (isRedirect(e)) throw e;
 			return fail(500, { error: 'Unable to connect to server' });
 		}
 	}
