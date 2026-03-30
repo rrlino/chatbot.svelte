@@ -1,5 +1,5 @@
-import { fail, redirect, isRedirect } from '@sveltejs/kit';
-import type { PageServerLoad, Actions } from './$types';
+import { fail, redirect } from '@sveltejs/kit';
+import type { PageServerLoad, Actions } from './';
 
 import { env } from '$env/dynamic/private';
 const API_BASE = env.API_BASE_URL || 'http://localhost:8080/api/v1';
@@ -26,49 +26,48 @@ export const actions: Actions = {
 			return fail(400, { error: 'Username and password are required' });
 		}
 
+		let response;
 		try {
-			const response = await fetch(resolveApiUrl('/auth/login'), {
+			response = await fetch(resolveApiUrl('/auth/login'), {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ username, password })
 			});
-
-			if (!response.ok) {
-				const errorData = await response.json().catch(() => ({}));
-				const message =
-					(errorData as Record<string, string>).error ||
-					(errorData as Record<string, string>).message ||
-					'Invalid credentials';
-				return fail(response.status, { error: message });
-			}
-
-			const data = (await response.json()) as { token: string; user: unknown };
-
-			if (data.token) {
-				cookies.set('authToken', data.token, {
-					path: '/',
-					httpOnly: false,
-					sameSite: 'lax',
-					secure: false,
-					maxAge: 60 * 60 * 24 * 7 // 7 days
-				});
-			}
-
-			// Store user info in a separate cookie for client-side access
-			if (data.user) {
-				cookies.set('user', JSON.stringify(data.user), {
-					path: '/',
-					httpOnly: false,
-					sameSite: 'lax',
-					secure: false,
-					maxAge: 60 * 60 * 24 * 7
-				});
-			}
-
-			throw redirect(303, '/dashboard');
-		} catch (e) {
-			if (isRedirect(e)) throw e;
+		} catch {
 			return fail(500, { error: 'Unable to connect to server' });
 		}
+
+		if (!response.ok) {
+			const errorData = await response.json().catch(() => ({}));
+			const message =
+				(errorData as Record<string, string>).error ||
+				(errorData as Record<string, string>).message ||
+				'Invalid credentials';
+			return fail(response.status, { error: message });
+		}
+
+		const data = (await response.json()) as { token: string; user: unknown };
+
+		if (data.token) {
+			cookies.set('authToken', data.token, {
+				path: '/',
+				httpOnly: false,
+				sameSite: 'lax',
+				secure: false,
+				maxAge: 60 * 60 * 24 * 7
+			});
+		}
+
+		if (data.user) {
+			cookies.set('user', JSON.stringify(data.user), {
+				path: '/',
+				httpOnly: false,
+				sameSite: 'lax',
+				secure: false,
+				maxAge: 60 * 60 * 24 * 7
+			});
+		}
+
+		redirect(303, '/dashboard');
 	}
 };
