@@ -46,17 +46,8 @@
 							const data = result.data as { error?: string };
 							formError = data.error || 'Login failed';
 							await update();
-						} else if (result.type === 'success' && result.data) {
-							const data = result.data as { token?: string; user?: unknown };
-							// Sync token to localStorage for apiFetch compatibility
-							if (data.token) {
-								localStorage.setItem('authToken', data.token);
-							}
-							if (data.user) {
-								localStorage.setItem('user', JSON.stringify(data.user));
-							}
-							goto('/dashboard', { replaceState: true });
 						}
+						// Redirect is handled server-side (303), no client-side goto needed
 					};
 				}}
 				data-testid="login-form"
